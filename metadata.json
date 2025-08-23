@@ -1,0 +1,5 @@
+{
+  "name": "GajiKaryawan Mingguan",
+  "description": "A web application to manage and calculate weekly employee payroll. This app helps track employees, their hourly rates, hours worked per week, and calculates their weekly salary. All data is saved locally in your browser.",
+  "requestFramePermissions": []
+}
