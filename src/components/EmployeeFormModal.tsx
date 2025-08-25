@@ -28,6 +28,7 @@ const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({ isOpen, onClose, 
                 setWeeklyAllowance(String(employeeToEdit.weeklyAllowance));
                 setImageUrl(employeeToEdit.imageUrl);
             } else {
+                // Reset form when opening for a new employee
                 setName('');
                 setPosition('');
                 setDailyRate('');
@@ -141,7 +142,7 @@ const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({ isOpen, onClose, 
                             type="text"
                             inputMode="numeric"
                             value={formatRupiahInput(dailyRate)}
-                            onChange={(e) => setDailyRate(parseRupiahInput(e.target.value))}
+                            onChange={(e) => setDailyRate(e.target.value)}
                             className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                             placeholder="cth: Rp 500.000"
                             required
@@ -154,7 +155,7 @@ const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({ isOpen, onClose, 
                             type="text"
                             inputMode="numeric"
                             value={formatRupiahInput(weeklyAllowance)}
-                            onChange={(e) => setWeeklyAllowance(parseRupiahInput(e.target.value))}
+                            onChange={(e) => setWeeklyAllowance(e.target.value)}
                             className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                             placeholder="cth: Rp 300.000"
                             required

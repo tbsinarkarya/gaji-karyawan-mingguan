@@ -22,6 +22,7 @@ const NavItem: React.FC<{
             onClick={onClick}
             className={`flex flex-col items-center justify-center w-full pt-2 pb-1 transition-colors ${activeClass} hover:text-indigo-600`}
             aria-label={`Buka ${label}`}
+            aria-current={isActive ? 'page' : undefined}
         >
             {icon}
             <span className="text-xs mt-1">{label}</span>

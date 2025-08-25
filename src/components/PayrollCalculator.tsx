@@ -36,11 +36,10 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
         const employeeId = e.target.value;
         setSelectedEmployeeId(employeeId);
         
-        const emp = employees.find(e => e.id === employeeId);
-        
+        // Reset inputs when selecting a new employee
         setCurrentInputs({
             daysWorked: '',
-            totalAllowance: emp ? String(emp.weeklyAllowance) : '',
+            totalAllowance: '',
             loanDeduction: '0',
         });
     };
@@ -53,8 +52,10 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
                 let newAllowance = prev.totalAllowance;
 
                 if (newDays === 6 && selectedEmployee) {
+                    // Automatically set allowance if days worked is 6
                     newAllowance = String(selectedEmployee.weeklyAllowance);
                 } else if (prev.daysWorked === '6' && newDays !== 6) { 
+                    // Clear allowance if days worked changes from 6
                     newAllowance = '';
                 }
                 
@@ -97,6 +98,8 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
         };
 
         setStagedPayments(prev => [...prev, newPayment].sort((a, b) => a.employeeName.localeCompare(b.employeeName)));
+        
+        // Reset form for next entry
         setSelectedEmployeeId('');
          setCurrentInputs({
             daysWorked: '',
@@ -165,7 +168,7 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
                                     <input
                                         id="days-worked"
                                         type="number"
-                                        placeholder="Jumlah hari"
+                                        placeholder="Jumlah hari (1-7)"
                                         value={currentInputs.daysWorked}
                                         onChange={e => handleInputChange('daysWorked', e.target.value)}
                                         className="w-full pl-4 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
@@ -194,7 +197,7 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
                                             id="loan-deduction"
                                             type="text"
                                             inputMode="numeric"
-                                            placeholder="cth: Rp 100.000"
+                                            placeholder="cth: Rp 0"
                                             value={formatRupiahInput(currentInputs.loanDeduction)}
                                             onChange={e => handleInputChange('loanDeduction', e.target.value)}
                                             className="w-full pl-4 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"

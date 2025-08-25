@@ -4,22 +4,22 @@
   "description": "A web application to manage and calculate weekly employee payroll. All data is saved locally in your browser.",
   "icons": [
     {
-      "src": "https://www.gstatic.com/images/branding/product/1x/drive_2020q4_48dp.png",
+      "src": "/logo48.png",
       "type": "image/png",
       "sizes": "48x48"
     },
     {
-      "src": "https://www.gstatic.com/images/branding/product/2x/drive_2020q4_96dp.png",
+      "src": "/logo96.png",
       "type": "image/png",
       "sizes": "96x96"
     },
     {
-      "src": "https://ssl.gstatic.com/images/branding/product/2x/hh_drive_96dp.png",
+      "src": "/logo192.png",
       "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "https://ssl.gstatic.com/images/branding/product/2x/hh_drive_192dp.png",
+      "src": "/logo512.png",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "any maskable"
