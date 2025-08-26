@@ -1,6 +1,5 @@
-const CACHE_NAME = 'gajikaryawan-cache-v3';
-// Aset inti yang akan selalu ada di cache. 
-// Aset lain (seperti file JS/CSS hasil build Vite) akan di-cache secara dinamis saat diakses.
+const CACHE_NAME = 'gajikaryawan-cache-v2';
+// Aset inti yang akan selalu ada di cache. Vite akan menambahkan aset lain saat build.
 const urlsToCache = [
   '/',
   '/index.html',
@@ -44,13 +43,8 @@ self.addEventListener('fetch', event => {
   // Strategi: Cache-first, lalu network.
   event.respondWith(
     caches.match(event.request).then(cachedResponse => {
-      // Jika ada di cache, langsung kembalikan.
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      
-      // Jika tidak ada di cache, ambil dari network.
-      return fetch(event.request).then(networkResponse => {
+      const fetchPromise = fetch(event.request)
+        .then(networkResponse => {
           // Hanya cache response yang valid dan bukan dari picsum.photos
           if (networkResponse && networkResponse.ok && !event.request.url.includes('picsum.photos')) {
             const responseToCache = networkResponse.clone();
@@ -59,12 +53,16 @@ self.addEventListener('fetch', event => {
             });
           }
           return networkResponse;
-        }).catch(() => {
-          // Jika network gagal, dan ini navigasi halaman, kembalikan halaman 404
+        })
+        .catch(() => {
+          // Jika network gagal, dan ini navigasi halaman, kembalikan halaman utama
           if (event.request.mode === 'navigate') {
-            return caches.match('/404.html');
+            return caches.match('/index.html');
           }
         });
+
+      // Kembalikan dari cache jika ada, jika tidak, tunggu hasil dari network.
+      return cachedResponse || fetchPromise;
     })
   );
 });

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { Employee, WeeklyPayroll, PayrollPayload } from './types.ts';
+import { getEmployees, getPayrolls, saveEmployees, savePayrolls } from './services/storageService.ts';
 import BottomNav from './components/BottomNav.tsx';
 import ConfirmationModal from './components/ConfirmationModal.tsx';
 import Dashboard from './components/Dashboard.tsx';
@@ -17,69 +18,30 @@ const App: React.FC = () => {
     const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<{ id: string; type: 'employee' | 'payroll' } | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    const fetchData = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            const [employeesRes, payrollsRes] = await Promise.all([
-                fetch('/api/employees'),
-                fetch('/api/payrolls')
-            ]);
-
-            if (!employeesRes.ok || !payrollsRes.ok) {
-                throw new Error('Gagal mengambil data dari server.');
-            }
-
-            const employeesData = await employeesRes.json();
-            const payrollsData = await payrollsRes.json();
-            
-            setEmployees(employeesData);
-            setPayrolls(payrollsData);
-
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Terjadi kesalahan tidak diketahui.');
-            console.error(err);
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
 
     useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+        setEmployees(getEmployees());
+        setPayrolls(getPayrolls());
+    }, []);
 
-    const handleAddEmployee = async (employee: Omit<Employee, 'id'>) => {
-        try {
-            const response = await fetch('/api/employees', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(employee),
-            });
-            if (!response.ok) throw new Error('Gagal menambahkan karyawan');
-            await fetchData(); // Refresh data
-            setIsModalOpen(false);
-        } catch (error) {
-            alert('Error: ' + (error as Error).message);
-        }
+    const handleAddEmployee = (employee: Omit<Employee, 'id'>) => {
+        const newEmployee: Employee = {
+            ...employee,
+            id: `emp-${Date.now()}`,
+            imageUrl: employee.imageUrl || `https://picsum.photos/seed/${Date.now()}/200`,
+        };
+        const updatedEmployees = [...employees, newEmployee];
+        setEmployees(updatedEmployees);
+        saveEmployees(updatedEmployees);
+        setIsModalOpen(false);
     };
 
-    const handleUpdateEmployee = async (employee: Employee) => {
-        try {
-            const response = await fetch(`/api/employees/${employee.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(employee),
-            });
-            if (!response.ok) throw new Error('Gagal memperbarui karyawan');
-            await fetchData(); // Refresh data
-            setIsModalOpen(false);
-            setEditingEmployee(null);
-        } catch (error) {
-            alert('Error: ' + (error as Error).message);
-        }
+    const handleUpdateEmployee = (employee: Employee) => {
+        const updatedEmployees = employees.map(e => e.id === employee.id ? employee : e);
+        setEmployees(updatedEmployees);
+        saveEmployees(updatedEmployees);
+        setIsModalOpen(false);
+        setEditingEmployee(null);
     };
     
     const handleDeleteEmployee = (id: string) => {
@@ -97,55 +59,81 @@ const App: React.FC = () => {
         setIsModalOpen(true);
     };
 
-    const handleProcessPayroll = useCallback(async (employeePayments: PayrollPayload[]) => {
-       try {
-            const response = await fetch('/api/payrolls', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ employeePayments }),
-            });
-            if (!response.ok) {
-                 const errorData = await response.json();
-                throw new Error(errorData.message || 'Gagal memproses gaji');
-            }
-            await fetchData(); // Refresh data
-            setCurrentView('history');
-        } catch (error) {
-            alert('Error: ' + (error as Error).message);
+    const handleProcessPayroll = useCallback((employeePayments: PayrollPayload[]) => {
+        const today = new Date();
+        const dayOfWeek = today.getDay();
+        const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+        const weekStartDate = new Date(today.setDate(diff));
+        const weekEndDate = new Date(weekStartDate);
+        weekEndDate.setDate(weekStartDate.getDate() + 6);
+
+        let totalPayroll = 0;
+        const processedPayments = employeePayments.map(p => {
+            const employee = employees.find(e => e.id === p.employeeId);
+            if (!employee) return null;
+
+            const basePay = employee.dailyRate * p.daysWorked;
+            const totalAllowance = p.totalAllowance;
+            const loanDeduction = p.loanDeduction;
+            const totalPay = basePay + totalAllowance - loanDeduction;
+            
+            totalPayroll += totalPay;
+
+            return {
+                employeeId: employee.id,
+                employeeName: employee.name,
+                position: employee.position,
+                daysWorked: p.daysWorked,
+                basePay,
+                totalAllowance,
+                loanDeduction,
+                totalPay,
+            };
+        }).filter(p => p !== null) as WeeklyPayroll['employeePayments'];
+
+        if (processedPayments.length === 0) {
+            alert("Tidak ada data gaji untuk diproses.");
+            return;
         }
-    }, [fetchData]);
+
+        const newPayroll: WeeklyPayroll = {
+            id: `payroll-${Date.now()}`,
+            weekStartDate: weekStartDate.toISOString().split('T')[0],
+            weekEndDate: weekEndDate.toISOString().split('T')[0],
+            totalPayroll,
+            employeePayments: processedPayments,
+        };
+
+        const updatedPayrolls = [newPayroll, ...payrolls];
+        setPayrolls(updatedPayrolls);
+        savePayrolls(updatedPayrolls);
+        setCurrentView('history');
+    }, [employees, payrolls]);
 
     const handleDeletePayroll = (id: string) => {
         setItemToDelete({ id, type: 'payroll' });
         setIsConfirmModalOpen(true);
     };
 
-    const handleConfirmDelete = async () => {
+    const handleConfirmDelete = () => {
         if (!itemToDelete) return;
 
-        const { id, type } = itemToDelete;
-        const url = type === 'employee' ? `/api/employees/${id}` : `/api/payrolls/${id}`;
-
-        try {
-            const response = await fetch(url, { method: 'DELETE' });
-            if (!response.ok) throw new Error(`Gagal menghapus ${type}`);
-            await fetchData(); // Refresh data
-        } catch (error) {
-             alert('Error: ' + (error as Error).message);
-        } finally {
-            setIsConfirmModalOpen(false);
-            setItemToDelete(null);
+        if (itemToDelete.type === 'employee') {
+            const updatedEmployees = employees.filter(e => e.id !== itemToDelete.id);
+            setEmployees(updatedEmployees);
+            saveEmployees(updatedEmployees);
+        } else if (itemToDelete.type === 'payroll') {
+            const updatedPayrolls = payrolls.filter(p => p.id !== itemToDelete.id);
+            setPayrolls(updatedPayrolls);
+            savePayrolls(updatedPayrolls);
         }
+        
+        setIsConfirmModalOpen(false);
+        setItemToDelete(null);
     };
 
-    const renderView = () => {
-        if (isLoading) {
-            return <div className="flex justify-center items-center h-64">Memuat data...</div>;
-        }
-        if (error) {
-            return <div className="text-center text-red-500 p-4 bg-red-50 rounded-lg">{error}</div>;
-        }
 
+    const renderView = () => {
         switch (currentView) {
             case 'dashboard':
                 return <Dashboard 
@@ -179,15 +167,15 @@ const App: React.FC = () => {
                 </main>
                 <BottomNav currentView={currentView} setCurrentView={setCurrentView} />
             </div>
-            
-            <EmployeeFormModal
-                isOpen={isModalOpen}
-                onClose={() => { setIsModalOpen(false); setEditingEmployee(null); }}
-                onAddEmployee={handleAddEmployee}
-                onUpdateEmployee={handleUpdateEmployee}
-                employeeToEdit={editingEmployee}
-            />
-            
+            {isModalOpen && (
+                <EmployeeFormModal
+                    isOpen={isModalOpen}
+                    onClose={() => { setIsModalOpen(false); setEditingEmployee(null); }}
+                    onAddEmployee={handleAddEmployee}
+                    onUpdateEmployee={handleUpdateEmployee}
+                    employeeToEdit={editingEmployee}
+                />
+            )}
             <ConfirmationModal
                 isOpen={isConfirmModalOpen}
                 onClose={() => {

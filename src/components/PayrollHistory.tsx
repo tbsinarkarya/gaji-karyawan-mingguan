@@ -55,7 +55,6 @@ const handlePrint = (payrollId: string) => {
 
     printWindow.document.close();
     printWindow.onload = function() {
-        // Delay to ensure Tailwind styles are applied
         setTimeout(() => {
             printWindow.focus();
             printWindow.print();
@@ -209,7 +208,7 @@ const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayro
         const groupedByMonth: Record<string, { totalPayroll: number; weeklyPayrolls: WeeklyPayroll[] }> = {};
 
         payrolls.forEach(payroll => {
-            const date = new Date(payroll.weekStartDate + 'T00:00:00'); // Prevent timezone issues
+            const date = new Date(payroll.weekStartDate + 'T00:00:00');
             const monthYear = date.toLocaleString('id-ID', { month: 'long', year: 'numeric' });
             if (!groupedByMonth[monthYear]) {
                 groupedByMonth[monthYear] = { totalPayroll: 0, weeklyPayrolls: [] };
@@ -220,14 +219,13 @@ const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayro
 
         return Object.entries(groupedByMonth)
             .map(([monthYear, data]) => ({ monthYear, ...data }))
-            // Sort by the first payroll date of each month, descending
             .sort((a, b) => new Date(b.weeklyPayrolls[0].weekStartDate).getTime() - new Date(a.weeklyPayrolls[0].weekStartDate).getTime());
 
     }, [payrolls]);
     
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center mb-3">
                 <h2 className="text-xl font-bold text-slate-700">Riwayat Gaji</h2>
             </div>
 

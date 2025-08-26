@@ -7,9 +7,9 @@ export const formatCurrency = (amount: number): string => {
 };
 
 export const formatDateRange = (start: string, end: string): string => {
-    // Dates from Prisma/API are full ISO strings, so they can be parsed directly.
-    const startDate = new Date(start);
-    const endDate = new Date(end);
+    // Menambahkan T00:00:00 untuk menghindari masalah zona waktu saat parsing
+    const startDate = new Date(start + 'T00:00:00');
+    const endDate = new Date(end + 'T00:00:00');
     const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
     return `${startDate.toLocaleDateString('id-ID', options)} - ${endDate.toLocaleDateString('id-ID', { ...options, year: 'numeric' })}`;
 };
@@ -23,5 +23,7 @@ export const formatRupiahInput = (value: string): string => {
 };
 
 export const parseRupiahInput = (value: string): string => {
+    // Mengembalikan hanya angka dari string (misal: "Rp 1.000" -> "1000")
+    // Memperbaiki bug: [^0-g] menjadi [^0-9]
     return value.replace(/[^0-9]/g, '');
 };

@@ -11,7 +11,7 @@
     ],
     "skipLibCheck": true,
     "types": [
-      "node"
+      // "node"  // Hapus atau beri komentar jika tidak diperlukan
     ],
     "moduleResolution": "bundler",
     "isolatedModules": true,
