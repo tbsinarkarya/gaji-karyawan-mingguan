@@ -1,12 +1,13 @@
 import { neon } from "@neondatabase/serverless";
+import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { Payroll } from "../../src/types";
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (req.method === "GET") {
-      // ambil semua payrolls urut dari terbaru
-      const result = await sql`
+      const result = await sql<Payroll[]>`
         SELECT id, week_start_date, week_end_date, total_payroll, created_at
         FROM payrolls
         ORDER BY week_start_date DESC
@@ -15,20 +16,17 @@ export default async function handler(req: any, res: any) {
     }
 
     if (req.method === "POST") {
-      const body = req.body;
+      const { week_start_date, week_end_date, total_payroll } = req.body;
 
-      // validasi input sederhana
-      if (!body.week_start_date || !body.week_end_date || !body.total_payroll) {
+      if (!week_start_date || !week_end_date || !total_payroll) {
         return res.status(400).json({ error: "Missing required fields" });
       }
 
-      // insert ke tabel sesuai schema
-      const inserted = await sql`
+      const inserted = await sql<Payroll[]>`
         INSERT INTO payrolls (week_start_date, week_end_date, total_payroll)
-        VALUES (${body.week_start_date}, ${body.week_end_date}, ${body.total_payroll})
+        VALUES (${week_start_date}, ${week_end_date}, ${total_payroll})
         RETURNING id, week_start_date, week_end_date, total_payroll, created_at
       `;
-
       return res.status(201).json(inserted[0]);
     }
 
