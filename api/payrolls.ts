@@ -1,21 +1,17 @@
-import type { NextApiRequest, NextApiResponse } from "next";
+// api/payrolls.ts (untuk Vercel serverless function murni)
 import { neon } from "@neondatabase/serverless";
 
-// koneksi database via environment variable
-const sql = neon(process.env.DATABASE_URL!);
+const sql = neon(process.env.NEON_DATABASE_URL!);
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: any, res: any) {
   try {
     if (req.method === "GET") {
-      // ambil semua payrolls dari tabel
       const result = await sql`SELECT * FROM payrolls ORDER BY week DESC`;
       return res.status(200).json(result);
     }
 
     if (req.method === "POST") {
       const body = req.body;
-
-      // simpan payroll baru
       const inserted = await sql`
         INSERT INTO payrolls (week, employee_id, total)
         VALUES (${body.week}, ${body.employee_id}, ${body.total})
