@@ -1,29 +1,32 @@
-import type { WeeklyPayroll } from '../src/types.ts';
+import type { NextApiRequest, NextApiResponse } from "next";
+import { neon } from "@neondatabase/serverless";
 
-// --- Payroll Functions ---
+// koneksi database via environment variable
+const sql = neon(process.env.DATABASE_URL!);
 
-export const getPayrolls = async (): Promise<WeeklyPayroll[]> => {
-    try {
-        const res = await fetch('/api/payrolls');
-        if (!res.ok) throw new Error('Failed to fetch payrolls');
-        return await res.json();
-    } catch (error) {
-        console.error("Failed to retrieve payrolls from API", error);
-        return [];
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  try {
+    if (req.method === "GET") {
+      // ambil semua payrolls dari tabel
+      const result = await sql`SELECT * FROM payrolls ORDER BY week DESC`;
+      return res.status(200).json(result);
     }
-};
 
-export const savePayroll = async (payroll: WeeklyPayroll): Promise<WeeklyPayroll> => {
-    try {
-        const res = await fetch('/api/payrolls', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payroll),
-        });
-        if (!res.ok) throw new Error('Failed to save payroll');
-        return await res.json();
-    } catch (error) {
-        console.error("Failed to save payroll to API", error);
-        throw error;
+    if (req.method === "POST") {
+      const body = req.body;
+
+      // simpan payroll baru
+      const inserted = await sql`
+        INSERT INTO payrolls (week, employee_id, total)
+        VALUES (${body.week}, ${body.employee_id}, ${body.total})
+        RETURNING *
+      `;
+      return res.status(201).json(inserted[0]);
     }
-};
+
+    return res.status(405).json({ error: "Method not allowed" });
+  } catch (err: any) {
+    console.error("API /payrolls error:", err);
+    return res.status(500).json({ error: "Internal Server Error", detail: err.message });
+  }
+}
