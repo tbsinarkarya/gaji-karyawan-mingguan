@@ -4,7 +4,7 @@ import type { WeeklyPayroll } from "../src/types";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
-  throw new Error("Missing NEON_DATABASE_URL environment variable");
+  throw new Error("Missing DATABASE_URL environment variable");
 }
 
 const sql = neon(connectionString);
