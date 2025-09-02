@@ -1,20 +1,17 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { Pool } from '@neondatabase/serverless';
+// pages/api/employees.js
+import { Pool } from "pg";
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method === 'GET') {
-    const { rows } = await pool.query('SELECT * FROM employees ORDER BY id');
-    res.status(200).json(rows);
-  } else if (req.method === 'POST') {
-    const { name, position, dailyRate, weeklyAllowance, imageUrl } = req.body;
-    const { rows } = await pool.query(
-      'INSERT INTO employees (name, position, daily_rate, weekly_allowance, image_url) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [name, position, dailyRate, weeklyAllowance, imageUrl]
-    );
-    res.status(201).json(rows[0]);
-  } else {
-    res.status(405).json({ message: 'Method Not Allowed' });
+export default async function handler(req, res) {
+  try {
+    const result = await pool.query("SELECT * FROM employees");
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error("DB Error:", error);
+    res.status(500).json({ error: "Database error" });
   }
 }
