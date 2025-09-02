@@ -7,23 +7,18 @@ export default function Login({ onSuccess }: { onSuccess: () => void }) {
   const [isSignup, setIsSignup] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSubmit = () => {
-    let success = false;
+  const handleSubmit = async () => {
+    const response = isSignup
+      ? await authService.signup(username, password)
+      : await authService.login(username, password);
 
-    if (isSignup) {
-      success = authService.signup(username, password);
-      if (!success) {
-        setError("Username sudah digunakan!");
-        return;
-      }
-    } else {
-      success = authService.login(username, password);
-      if (!success) {
-        setError("Username atau password salah!");
-        return;
-      }
+    if (response.error) {
+      setError(response.error);
+      return;
     }
 
+    // Simpan user aktif di localStorage (session sederhana)
+    authService.setActiveUser(response.user);
     setError("");
     onSuccess();
   };
