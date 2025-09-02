@@ -8,6 +8,12 @@ export default function Login({ onSuccess }: { onSuccess: () => void }) {
   const [error, setError] = useState("");
 
   const handleSubmit = async () => {
+    // ✅ Validasi input sebelum kirim ke backend
+    if (!username || !password) {
+      setError("Username dan password wajib diisi");
+      return;
+    }
+
     const response = isSignup
       ? await authService.signup(username, password)
       : await authService.login(username, password);
@@ -20,7 +26,7 @@ export default function Login({ onSuccess }: { onSuccess: () => void }) {
     // Simpan user aktif di localStorage (session sederhana)
     authService.setActiveUser(response.user);
     setError("");
-    onSuccess();
+    onSuccess(); // bisa diarahkan ke dashboard
   };
 
   return (
