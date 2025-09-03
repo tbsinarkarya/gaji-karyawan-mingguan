@@ -6,7 +6,7 @@ export async function getEmployees(): Promise<Employee[]> {
   return await res.json();
 }
 
-export async function saveEmployee(employee: Employee): Promise<Employee> {
+export async function saveEmployee(employee: Partial<Employee>): Promise<Employee> {
   const res = await fetch("/api/employees", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
