@@ -1,17 +1,17 @@
-// pages/api/employees.js
-import { Pool } from "pg";
+import type { Employee } from "../types";
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
+export async function getEmployees(): Promise<Employee[]> {
+  const res = await fetch("/api/employees", { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to fetch employees");
+  return await res.json();
+}
 
-export default async function handler(req, res) {
-  try {
-    const result = await pool.query("SELECT * FROM employees");
-    res.status(200).json(result.rows);
-  } catch (error) {
-    console.error("DB Error:", error);
-    res.status(500).json({ error: "Database error" });
-  }
+export async function saveEmployee(employee: Employee): Promise<Employee> {
+  const res = await fetch("/api/employees", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(employee),
+  });
+  if (!res.ok) throw new Error("Failed to save employee");
+  return await res.json();
 }
