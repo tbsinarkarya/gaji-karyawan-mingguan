@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import type { Employee, WeeklyPayroll, PayrollPayload } from './types.ts';
-import { getEmployees, getPayrolls, saveEmployees, savePayrolls } from './services/storageService.ts';
+import React from 'react';
+import type { Employee, WeeklyPayroll } from './types.ts';
 import BottomNav from './components/BottomNav.tsx';
 import ConfirmationModal from './components/ConfirmationModal.tsx';
 import Dashboard from './components/Dashboard.tsx';
@@ -8,186 +7,166 @@ import EmployeeFormModal from './components/EmployeeFormModal.tsx';
 import PayrollCalculator from './components/PayrollCalculator.tsx';
 import PayrollHistory from './components/PayrollHistory.tsx';
 
+const { useState, useEffect, useCallback } = React;
+
 type View = 'dashboard' | 'calculator' | 'history';
 
+interface PayrollPayload {
+  employeeId: string;
+  daysWorked: number;
+  totalAllowance: number;
+  loanDeduction: number;
+}
+
 const App: React.FC = () => {
-    const [employees, setEmployees] = useState<Employee[]>([]);
-    const [payrolls, setPayrolls] = useState<WeeklyPayroll[]>([]);
-    const [currentView, setCurrentView] = useState<View>('dashboard');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-    const [itemToDelete, setItemToDelete] = useState<{ id: string; type: 'employee' | 'payroll' } | null>(null);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [payrolls, setPayrolls] = useState<WeeklyPayroll[]>([]);
+  const [currentView, setCurrentView] = useState<View>('dashboard');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<{ id: string; type: 'employee' | 'payroll' } | null>(null);
 
-    useEffect(() => {
-        setEmployees(getEmployees());
-        setPayrolls(getPayrolls());
-    }, []);
+  // --- Load data dari API ---
+  useEffect(() => {
+    fetch("/api/employees")
+      .then(res => res.json())
+      .then(data => setEmployees(data))
+      .catch(err => console.error("Error fetching employees:", err));
 
-    const handleAddEmployee = (employee: Omit<Employee, 'id'>) => {
-        const newEmployee: Employee = {
-            ...employee,
-            id: `emp-${Date.now()}`,
-            imageUrl: employee.imageUrl || `https://picsum.photos/seed/${Date.now()}/200`,
-        };
-        const updatedEmployees = [...employees, newEmployee];
-        setEmployees(updatedEmployees);
-        saveEmployees(updatedEmployees);
-        setIsModalOpen(false);
-    };
+    fetch("/api/payrolls")
+      .then(res => res.json())
+      .then(data => setPayrolls(data))
+      .catch(err => console.error("Error fetching payrolls:", err));
+  }, []);
 
-    const handleUpdateEmployee = (employee: Employee) => {
-        const updatedEmployees = employees.map(e => e.id === employee.id ? employee : e);
-        setEmployees(updatedEmployees);
-        saveEmployees(updatedEmployees);
-        setIsModalOpen(false);
-        setEditingEmployee(null);
-    };
-    
-    const handleDeleteEmployee = (id: string) => {
-        setItemToDelete({ id, type: 'employee' });
-        setIsConfirmModalOpen(true);
-    };
+  // --- Employee CRUD ---
+  const handleAddEmployee = async (employee: Omit<Employee, 'id'>) => {
+    const res = await fetch("/api/employees", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(employee),
+    });
+    const newEmployee = await res.json();
+    setEmployees(prev => [...prev, newEmployee]);
+    setIsModalOpen(false);
+  };
 
-    const handleOpenEditModal = (employee: Employee) => {
-        setEditingEmployee(employee);
-        setIsModalOpen(true);
-    };
-    
-    const handleOpenAddModal = () => {
-        setEditingEmployee(null);
-        setIsModalOpen(true);
-    };
+  const handleUpdateEmployee = async (employee: Employee) => {
+    const res = await fetch(`/api/employees/${employee.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(employee),
+    });
+    const updated = await res.json();
+    setEmployees(prev => prev.map(e => e.id === updated.id ? updated : e));
+    setIsModalOpen(false);
+    setEditingEmployee(null);
+  };
 
-    const handleProcessPayroll = useCallback((employeePayments: PayrollPayload[]) => {
-        const today = new Date();
-        const dayOfWeek = today.getDay();
-        const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-        const weekStartDate = new Date(today.setDate(diff));
-        const weekEndDate = new Date(weekStartDate);
-        weekEndDate.setDate(weekStartDate.getDate() + 6);
+  const handleDeleteEmployee = (id: string) => {
+    setItemToDelete({ id, type: 'employee' });
+    setIsConfirmModalOpen(true);
+  };
 
-        let totalPayroll = 0;
-        const processedPayments = employeePayments.map(p => {
-            const employee = employees.find(e => e.id === p.employeeId);
-            if (!employee) return null;
+  const handleOpenEditModal = (employee: Employee) => {
+    setEditingEmployee(employee);
+    setIsModalOpen(true);
+  };
 
-            const basePay = employee.dailyRate * p.daysWorked;
-            const totalAllowance = p.totalAllowance;
-            const loanDeduction = p.loanDeduction;
-            const totalPay = basePay + totalAllowance - loanDeduction;
-            
-            totalPayroll += totalPay;
+  const handleOpenAddModal = () => {
+    setEditingEmployee(null);
+    setIsModalOpen(true);
+  };
 
-            return {
-                employeeId: employee.id,
-                employeeName: employee.name,
-                position: employee.position,
-                daysWorked: p.daysWorked,
-                basePay,
-                totalAllowance,
-                loanDeduction,
-                totalPay,
-            };
-        }).filter(p => p !== null) as WeeklyPayroll['employeePayments'];
+  // --- Payroll ---
+  const handleProcessPayroll = useCallback(async (employeePayments: PayrollPayload[]) => {
+    const res = await fetch("/api/payrolls", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ employeePayments }),
+    });
+    const newPayroll = await res.json();
 
-        if (processedPayments.length === 0) {
-            alert("Tidak ada data gaji untuk diproses.");
-            return;
-        }
+    setPayrolls(prev => [newPayroll, ...prev]);
+    setCurrentView('history');
+  }, []);
 
-        const newPayroll: WeeklyPayroll = {
-            id: `payroll-${Date.now()}`,
-            weekStartDate: weekStartDate.toISOString().split('T')[0],
-            weekEndDate: weekEndDate.toISOString().split('T')[0],
-            totalPayroll,
-            employeePayments: processedPayments,
-        };
+  const handleDeletePayroll = (id: string) => {
+    setItemToDelete({ id, type: 'payroll' });
+    setIsConfirmModalOpen(true);
+  };
 
-        const updatedPayrolls = [newPayroll, ...payrolls];
-        setPayrolls(updatedPayrolls);
-        savePayrolls(updatedPayrolls);
-        setCurrentView('history');
-    }, [employees, payrolls]);
+  const handleConfirmDelete = async () => {
+    if (!itemToDelete) return;
 
-    const handleDeletePayroll = (id: string) => {
-        setItemToDelete({ id, type: 'payroll' });
-        setIsConfirmModalOpen(true);
-    };
+    if (itemToDelete.type === 'employee') {
+      await fetch(`/api/employees/${itemToDelete.id}`, { method: "DELETE" });
+      setEmployees(prev => prev.filter(e => e.id !== itemToDelete.id));
+    } else if (itemToDelete.type === 'payroll') {
+      await fetch(`/api/payrolls/${itemToDelete.id}`, { method: "DELETE" });
+      setPayrolls(prev => prev.filter(p => p.id !== itemToDelete.id));
+    }
 
-    const handleConfirmDelete = () => {
-        if (!itemToDelete) return;
+    setIsConfirmModalOpen(false);
+    setItemToDelete(null);
+  };
 
-        if (itemToDelete.type === 'employee') {
-            const updatedEmployees = employees.filter(e => e.id !== itemToDelete.id);
-            setEmployees(updatedEmployees);
-            saveEmployees(updatedEmployees);
-        } else if (itemToDelete.type === 'payroll') {
-            const updatedPayrolls = payrolls.filter(p => p.id !== itemToDelete.id);
-            setPayrolls(updatedPayrolls);
-            savePayrolls(updatedPayrolls);
-        }
-        
-        setIsConfirmModalOpen(false);
-        setItemToDelete(null);
-    };
+  const renderView = () => {
+    switch (currentView) {
+      case 'dashboard':
+        return <Dashboard
+          employees={employees}
+          payrolls={payrolls}
+          onAddEmployee={handleOpenAddModal}
+          onEditEmployee={handleOpenEditModal}
+          onDeleteEmployee={handleDeleteEmployee} />;
+      case 'calculator':
+        return <PayrollCalculator employees={employees} onProcessPayroll={handleProcessPayroll} />;
+      case 'history':
+        return <PayrollHistory payrolls={payrolls} onDeletePayroll={handleDeletePayroll} />;
+      default:
+        return <Dashboard
+          employees={employees}
+          payrolls={payrolls}
+          onAddEmployee={handleOpenAddModal}
+          onEditEmployee={handleOpenEditModal}
+          onDeleteEmployee={handleDeleteEmployee} />;
+    }
+  };
 
-
-    const renderView = () => {
-        switch (currentView) {
-            case 'dashboard':
-                return <Dashboard 
-                    employees={employees} 
-                    payrolls={payrolls} 
-                    onAddEmployee={handleOpenAddModal} 
-                    onEditEmployee={handleOpenEditModal}
-                    onDeleteEmployee={handleDeleteEmployee} />;
-            case 'calculator':
-                return <PayrollCalculator employees={employees} onProcessPayroll={handleProcessPayroll} />;
-            case 'history':
-                return <PayrollHistory payrolls={payrolls} onDeletePayroll={handleDeletePayroll} />;
-            default:
-                return <Dashboard 
-                    employees={employees} 
-                    payrolls={payrolls} 
-                    onAddEmployee={handleOpenAddModal}
-                    onEditEmployee={handleOpenEditModal}
-                    onDeleteEmployee={handleDeleteEmployee} />;
-        }
-    };
-
-    return (
-        <div className="min-h-screen bg-slate-100 font-sans">
-            <div className="max-w-md mx-auto bg-white shadow-lg min-h-screen pb-20">
-                <header className="bg-indigo-600 text-white p-4 shadow-md sticky top-0 z-10">
-                    <h1 className="text-2xl font-bold text-center">GajiKaryawan</h1>
-                </header>
-                <main className="p-4">
-                    {renderView()}
-                </main>
-                <BottomNav currentView={currentView} setCurrentView={setCurrentView} />
-            </div>
-            {isModalOpen && (
-                <EmployeeFormModal
-                    isOpen={isModalOpen}
-                    onClose={() => { setIsModalOpen(false); setEditingEmployee(null); }}
-                    onAddEmployee={handleAddEmployee}
-                    onUpdateEmployee={handleUpdateEmployee}
-                    employeeToEdit={editingEmployee}
-                />
-            )}
-            <ConfirmationModal
-                isOpen={isConfirmModalOpen}
-                onClose={() => {
-                    setIsConfirmModalOpen(false);
-                    setItemToDelete(null);
-                }}
-                onConfirm={handleConfirmDelete}
-                title="Konfirmasi Penghapusan"
-                message="Apakah Anda yakin ingin menghapus data ini? Tindakan ini tidak dapat dibatalkan."
-            />
-        </div>
-    );
+  return (
+    <div className="min-h-screen bg-slate-100 font-sans">
+      <div className="max-w-md mx-auto bg-white shadow-lg min-h-screen pb-20">
+        <header className="bg-brand-primary text-white p-4 shadow-md">
+          <h1 className="text-2xl font-bold text-center">Payroll App</h1>
+        </header>
+        <main className="p-4">
+          {renderView()}
+        </main>
+        <BottomNav currentView={currentView} setCurrentView={setCurrentView} />
+      </div>
+      {isModalOpen && (
+        <EmployeeFormModal
+          isOpen={isModalOpen}
+          onClose={() => { setIsModalOpen(false); setEditingEmployee(null); }}
+          onAddEmployee={handleAddEmployee}
+          onUpdateEmployee={handleUpdateEmployee}
+          employeeToEdit={editingEmployee}
+        />
+      )}
+      <ConfirmationModal
+        isOpen={isConfirmModalOpen}
+        onClose={() => {
+          setIsConfirmModalOpen(false);
+          setItemToDelete(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        title="Konfirmasi Penghapusan"
+        message="Apakah Anda yakin ingin menghapus data ini? Tindakan ini tidak dapat dibatalkan."
+      />
+    </div>
+  );
 };
 
 export default App;
