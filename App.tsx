@@ -18,6 +18,34 @@ interface PayrollPayload {
   loanDeduction: number;
 }
 
+// ✅ ErrorBoundary untuk cegah blank page
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("App crashed:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-6 text-center text-red-600">
+          <h2 className="font-bold text-lg">Terjadi kesalahan</h2>
+          <p>Silakan refresh halaman.</p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const App: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [payrolls, setPayrolls] = useState<WeeklyPayroll[]>([]);
@@ -27,41 +55,70 @@ const App: React.FC = () => {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{ id: string; type: 'employee' | 'payroll' } | null>(null);
 
-  // --- Load data dari API ---
+  // --- Load data dari API dengan error handling ---
   useEffect(() => {
-    fetch("/api/employees")
-      .then(res => res.json())
-      .then(data => setEmployees(data))
-      .catch(err => console.error("Error fetching employees:", err));
+    const loadEmployees = async () => {
+      try {
+        const res = await fetch("/api/employees");
+        if (!res.ok) throw new Error(`Failed: ${res.status}`);
+        const data = await res.json();
+        setEmployees(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Error fetching employees:", err);
+        setEmployees([]); // fallback kosong
+      }
+    };
 
-    fetch("/api/payrolls")
-      .then(res => res.json())
-      .then(data => setPayrolls(data))
-      .catch(err => console.error("Error fetching payrolls:", err));
+    const loadPayrolls = async () => {
+      try {
+        const res = await fetch("/api/payrolls");
+        if (!res.ok) throw new Error(`Failed: ${res.status}`);
+        const data = await res.json();
+        setPayrolls(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Error fetching payrolls:", err);
+        setPayrolls([]); // fallback kosong
+      }
+    };
+
+    loadEmployees();
+    loadPayrolls();
   }, []);
 
   // --- Employee CRUD ---
   const handleAddEmployee = async (employee: Omit<Employee, 'id'>) => {
-    const res = await fetch("/api/employees", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(employee),
-    });
-    const newEmployee = await res.json();
-    setEmployees(prev => [...prev, newEmployee]);
-    setIsModalOpen(false);
+    try {
+      const res = await fetch("/api/employees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(employee),
+      });
+      if (!res.ok) throw new Error("Gagal tambah employee");
+      const newEmployee = await res.json();
+      setEmployees(prev => [...prev, newEmployee]);
+    } catch (err) {
+      console.error("Error add employee:", err);
+    } finally {
+      setIsModalOpen(false);
+    }
   };
 
   const handleUpdateEmployee = async (employee: Employee) => {
-    const res = await fetch(`/api/employees/${employee.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(employee),
-    });
-    const updated = await res.json();
-    setEmployees(prev => prev.map(e => e.id === updated.id ? updated : e));
-    setIsModalOpen(false);
-    setEditingEmployee(null);
+    try {
+      const res = await fetch(`/api/employees/${employee.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(employee),
+      });
+      if (!res.ok) throw new Error("Gagal update employee");
+      const updated = await res.json();
+      setEmployees(prev => prev.map(e => e.id === updated.id ? updated : e));
+    } catch (err) {
+      console.error("Error update employee:", err);
+    } finally {
+      setIsModalOpen(false);
+      setEditingEmployee(null);
+    }
   };
 
   const handleDeleteEmployee = (id: string) => {
@@ -81,15 +138,19 @@ const App: React.FC = () => {
 
   // --- Payroll ---
   const handleProcessPayroll = useCallback(async (employeePayments: PayrollPayload[]) => {
-    const res = await fetch("/api/payrolls", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ employeePayments }),
-    });
-    const newPayroll = await res.json();
-
-    setPayrolls(prev => [newPayroll, ...prev]);
-    setCurrentView('history');
+    try {
+      const res = await fetch("/api/payrolls", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeePayments }),
+      });
+      if (!res.ok) throw new Error("Gagal proses payroll");
+      const newPayroll = await res.json();
+      setPayrolls(prev => [newPayroll, ...prev]);
+      setCurrentView('history');
+    } catch (err) {
+      console.error("Error process payroll:", err);
+    }
   }, []);
 
   const handleDeletePayroll = (id: string) => {
@@ -99,17 +160,20 @@ const App: React.FC = () => {
 
   const handleConfirmDelete = async () => {
     if (!itemToDelete) return;
-
-    if (itemToDelete.type === 'employee') {
-      await fetch(`/api/employees/${itemToDelete.id}`, { method: "DELETE" });
-      setEmployees(prev => prev.filter(e => e.id !== itemToDelete.id));
-    } else if (itemToDelete.type === 'payroll') {
-      await fetch(`/api/payrolls/${itemToDelete.id}`, { method: "DELETE" });
-      setPayrolls(prev => prev.filter(p => p.id !== itemToDelete.id));
+    try {
+      if (itemToDelete.type === 'employee') {
+        await fetch(`/api/employees/${itemToDelete.id}`, { method: "DELETE" });
+        setEmployees(prev => prev.filter(e => e.id !== itemToDelete.id));
+      } else if (itemToDelete.type === 'payroll') {
+        await fetch(`/api/payrolls/${itemToDelete.id}`, { method: "DELETE" });
+        setPayrolls(prev => prev.filter(p => p.id !== itemToDelete.id));
+      }
+    } catch (err) {
+      console.error("Error delete:", err);
+    } finally {
+      setIsConfirmModalOpen(false);
+      setItemToDelete(null);
     }
-
-    setIsConfirmModalOpen(false);
-    setItemToDelete(null);
   };
 
   const renderView = () => {
@@ -136,36 +200,38 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 font-sans">
-      <div className="max-w-md mx-auto bg-white shadow-lg min-h-screen pb-20">
-        <header className="bg-brand-primary text-white p-4 shadow-md">
-          <h1 className="text-2xl font-bold text-center">Payroll App</h1>
-        </header>
-        <main className="p-4">
-          {renderView()}
-        </main>
-        <BottomNav currentView={currentView} setCurrentView={setCurrentView} />
-      </div>
-      {isModalOpen && (
-        <EmployeeFormModal
-          isOpen={isModalOpen}
-          onClose={() => { setIsModalOpen(false); setEditingEmployee(null); }}
-          onAddEmployee={handleAddEmployee}
-          onUpdateEmployee={handleUpdateEmployee}
-          employeeToEdit={editingEmployee}
+    <ErrorBoundary>
+      <div className="min-h-screen bg-slate-100 font-sans">
+        <div className="max-w-md mx-auto bg-white shadow-lg min-h-screen pb-20">
+          <header className="bg-brand-primary text-white p-4 shadow-md">
+            <h1 className="text-2xl font-bold text-center">Payroll App</h1>
+          </header>
+          <main className="p-4">
+            {renderView()}
+          </main>
+          <BottomNav currentView={currentView} setCurrentView={setCurrentView} />
+        </div>
+        {isModalOpen && (
+          <EmployeeFormModal
+            isOpen={isModalOpen}
+            onClose={() => { setIsModalOpen(false); setEditingEmployee(null); }}
+            onAddEmployee={handleAddEmployee}
+            onUpdateEmployee={handleUpdateEmployee}
+            employeeToEdit={editingEmployee}
+          />
+        )}
+        <ConfirmationModal
+          isOpen={isConfirmModalOpen}
+          onClose={() => {
+            setIsConfirmModalOpen(false);
+            setItemToDelete(null);
+          }}
+          onConfirm={handleConfirmDelete}
+          title="Konfirmasi Penghapusan"
+          message="Apakah Anda yakin ingin menghapus data ini? Tindakan ini tidak dapat dibatalkan."
         />
-      )}
-      <ConfirmationModal
-        isOpen={isConfirmModalOpen}
-        onClose={() => {
-          setIsConfirmModalOpen(false);
-          setItemToDelete(null);
-        }}
-        onConfirm={handleConfirmDelete}
-        title="Konfirmasi Penghapusan"
-        message="Apakah Anda yakin ingin menghapus data ini? Tindakan ini tidak dapat dibatalkan."
-      />
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 };
 
