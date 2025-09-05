@@ -1,14 +1,15 @@
 export interface Employee {
-  id: string;
+  id: number;
   name: string;
   position: string;
-  dailyRate: number;
-  weeklyAllowance: number;
-  imageUrl: string;
+  daily_rate: number;
+  weekly_allowance: number;
+  image_url: string | null;
+  created_at: string;
 }
 
 export interface EmployeePayment {
-  employeeId: string;
+  employeeId: number;
   employeeName: string;
   position: string;
   daysWorked: number;
@@ -19,7 +20,7 @@ export interface EmployeePayment {
 }
 
 export interface WeeklyPayroll {
-  id: string;
+  id: number;
   weekStartDate: string;
   weekEndDate: string;
   totalPayroll: number;

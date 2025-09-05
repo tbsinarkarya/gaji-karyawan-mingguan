@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Employee, WeeklyPayroll } from './types.ts';
+import type { Employee, WeeklyPayroll } from '@/types';
 import BottomNav from './components/BottomNav.tsx';
 import ConfirmationModal from './components/ConfirmationModal.tsx';
 import Dashboard from './components/Dashboard.tsx';
