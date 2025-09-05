@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import type { WeeklyPayroll } from "../src/types";
+import type { WeeklyPayroll } from "../types";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
