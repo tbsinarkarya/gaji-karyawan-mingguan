@@ -12,13 +12,13 @@ import PayrollHistory from "../components/PayrollHistory";
 type View = "dashboard" | "calculator" | "history";
 
 interface PayrollPayload {
-  employeeId: number; // ✅ ubah ke number (sesuai types.ts)
+  employeeId: number;
   daysWorked: number;
   totalAllowance: number;
   loanDeduction: number;
 }
 
-// ✅ ErrorBoundary sederhana
+// ErrorBoundary untuk cegah blank page
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean }
@@ -57,11 +57,11 @@ export default function Page() {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{
-    id: number; // ✅ ubah ke number
+    id: number;
     type: "employee" | "payroll";
   } | null>(null);
 
-  // --- Load data dari API ---
+  // --- Load data API ---
   useEffect(() => {
     const loadEmployees = async () => {
       try {
@@ -100,7 +100,7 @@ export default function Page() {
         body: JSON.stringify(employee),
       });
       if (!res.ok) throw new Error("Gagal tambah employee");
-      const newEmployee = await res.json();
+      const newEmployee: Employee = await res.json();
       setEmployees((prev) => [...prev, newEmployee]);
     } catch (err) {
       console.error("Error add employee:", err);
@@ -117,10 +117,8 @@ export default function Page() {
         body: JSON.stringify(employee),
       });
       if (!res.ok) throw new Error("Gagal update employee");
-      const updated = await res.json();
-      setEmployees((prev) =>
-        prev.map((e) => (e.id === updated.id ? updated : e))
-      );
+      const updated: Employee = await res.json();
+      setEmployees((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
     } catch (err) {
       console.error("Error update employee:", err);
     } finally {
@@ -145,24 +143,21 @@ export default function Page() {
   };
 
   // --- Payroll ---
-  const handleProcessPayroll = useCallback(
-    async (employeePayments: PayrollPayload[]) => {
-      try {
-        const res = await fetch("/api/payrolls", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ employeePayments }),
-        });
-        if (!res.ok) throw new Error("Gagal proses payroll");
-        const newPayroll = await res.json();
-        setPayrolls((prev) => [newPayroll, ...prev]);
-        setCurrentView("history");
-      } catch (err) {
-        console.error("Error process payroll:", err);
-      }
-    },
-    []
-  );
+  const handleProcessPayroll = useCallback(async (employeePayments: PayrollPayload[]) => {
+    try {
+      const res = await fetch("/api/payrolls", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeePayments }),
+      });
+      if (!res.ok) throw new Error("Gagal proses payroll");
+      const newPayroll: WeeklyPayroll = await res.json();
+      setPayrolls((prev) => [newPayroll, ...prev]);
+      setCurrentView("history");
+    } catch (err) {
+      console.error("Error process payroll:", err);
+    }
+  }, []);
 
   const handleDeletePayroll = (id: number) => {
     setItemToDelete({ id, type: "payroll" });
@@ -174,14 +169,10 @@ export default function Page() {
     try {
       if (itemToDelete.type === "employee") {
         await fetch(`/api/employees/${itemToDelete.id}`, { method: "DELETE" });
-        setEmployees((prev) =>
-          prev.filter((e) => e.id !== itemToDelete.id)
-        );
+        setEmployees((prev) => prev.filter((e) => e.id !== itemToDelete.id));
       } else if (itemToDelete.type === "payroll") {
         await fetch(`/api/payrolls/${itemToDelete.id}`, { method: "DELETE" });
-        setPayrolls((prev) =>
-          prev.filter((p) => p.id !== itemToDelete.id)
-        );
+        setPayrolls((prev) => prev.filter((p) => p.id !== itemToDelete.id));
       }
     } catch (err) {
       console.error("Error delete:", err);
