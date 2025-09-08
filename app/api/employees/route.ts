@@ -10,11 +10,12 @@ export async function GET() {
     const result = await pool.query("SELECT * FROM employees ORDER BY id DESC");
     return Response.json(result.rows);
   } catch (error) {
+    console.error("GET /api/employees error:", error);
     return new Response("Database read error", { status: 500 });
   }
 }
 
-export async function POST(req) {
+export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { name, position, daily_rate, weekly_allowance, image_url } = body;
@@ -27,6 +28,7 @@ export async function POST(req) {
 
     return Response.json(result.rows[0]);
   } catch (error) {
+    console.error("POST /api/employees error:", error);
     return new Response("Database insert error", { status: 500 });
   }
 }

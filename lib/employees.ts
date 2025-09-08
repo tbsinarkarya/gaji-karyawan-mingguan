@@ -1,8 +1,8 @@
-import type { Employee } from "../types";
+import type { Employee } from "@/types";
 
 export async function getEmployees(): Promise<Employee[]> {
   const res = await fetch("/api/employees", { cache: "no-store" });
-  if (!res.ok) throw new Error("Failed to fetch employees");
+  if (!res.ok) throw new Error("Gagal fetch employees");
   return res.json();
 }
 
@@ -12,6 +12,6 @@ export async function saveEmployee(employee: Partial<Employee>): Promise<Employe
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(employee),
   });
-  if (!res.ok) throw new Error("Failed to save employee");
+  if (!res.ok) throw new Error("Gagal simpan employee");
   return res.json();
 }

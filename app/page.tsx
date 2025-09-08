@@ -1,25 +1,28 @@
-import React from 'react';
-import type { Employee, WeeklyPayroll } from './types.ts';
-import BottomNav from './components/BottomNav.tsx';
-import ConfirmationModal from './components/ConfirmationModal.tsx';
-import Dashboard from './components/Dashboard.tsx';
-import EmployeeFormModal from './components/EmployeeFormModal.tsx';
-import PayrollCalculator from './components/PayrollCalculator.tsx';
-import PayrollHistory from './components/PayrollHistory.tsx';
+"use client";
 
-const { useState, useEffect, useCallback } = React;
+import React, { useEffect, useState, useCallback } from "react";
+import type { Employee, WeeklyPayroll } from "@/types";
+import BottomNav from "../components/BottomNav";
+import ConfirmationModal from "../components/ConfirmationModal";
+import Dashboard from "../components/Dashboard";
+import EmployeeFormModal from "../components/EmployeeFormModal";
+import PayrollCalculator from "../components/PayrollCalculator";
+import PayrollHistory from "../components/PayrollHistory";
 
-type View = 'dashboard' | 'calculator' | 'history';
+type View = "dashboard" | "calculator" | "history";
 
 interface PayrollPayload {
-  employeeId: string;
+  employeeId: number;
   daysWorked: number;
   totalAllowance: number;
   loanDeduction: number;
 }
 
-// ✅ ErrorBoundary untuk cegah blank page
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+// ErrorBoundary untuk cegah blank page
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
   constructor(props: { children: React.ReactNode }) {
     super(props);
     this.state = { hasError: false };
@@ -46,16 +49,19 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   }
 }
 
-const App: React.FC = () => {
+export default function Page() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [payrolls, setPayrolls] = useState<WeeklyPayroll[]>([]);
-  const [currentView, setCurrentView] = useState<View>('dashboard');
+  const [currentView, setCurrentView] = useState<View>("dashboard");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<{ id: string; type: 'employee' | 'payroll' } | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<{
+    id: number;
+    type: "employee" | "payroll";
+  } | null>(null);
 
-  // --- Load data dari API dengan error handling ---
+  // --- Load data API ---
   useEffect(() => {
     const loadEmployees = async () => {
       try {
@@ -65,7 +71,7 @@ const App: React.FC = () => {
         setEmployees(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error("Error fetching employees:", err);
-        setEmployees([]); // fallback kosong
+        setEmployees([]);
       }
     };
 
@@ -77,7 +83,7 @@ const App: React.FC = () => {
         setPayrolls(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error("Error fetching payrolls:", err);
-        setPayrolls([]); // fallback kosong
+        setPayrolls([]);
       }
     };
 
@@ -86,7 +92,7 @@ const App: React.FC = () => {
   }, []);
 
   // --- Employee CRUD ---
-  const handleAddEmployee = async (employee: Omit<Employee, 'id'>) => {
+  const handleAddEmployee = async (employee: Omit<Employee, "id">) => {
     try {
       const res = await fetch("/api/employees", {
         method: "POST",
@@ -94,8 +100,8 @@ const App: React.FC = () => {
         body: JSON.stringify(employee),
       });
       if (!res.ok) throw new Error("Gagal tambah employee");
-      const newEmployee = await res.json();
-      setEmployees(prev => [...prev, newEmployee]);
+      const newEmployee: Employee = await res.json();
+      setEmployees((prev) => [...prev, newEmployee]);
     } catch (err) {
       console.error("Error add employee:", err);
     } finally {
@@ -111,8 +117,8 @@ const App: React.FC = () => {
         body: JSON.stringify(employee),
       });
       if (!res.ok) throw new Error("Gagal update employee");
-      const updated = await res.json();
-      setEmployees(prev => prev.map(e => e.id === updated.id ? updated : e));
+      const updated: Employee = await res.json();
+      setEmployees((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
     } catch (err) {
       console.error("Error update employee:", err);
     } finally {
@@ -121,8 +127,8 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDeleteEmployee = (id: string) => {
-    setItemToDelete({ id, type: 'employee' });
+  const handleDeleteEmployee = (id: number) => {
+    setItemToDelete({ id, type: "employee" });
     setIsConfirmModalOpen(true);
   };
 
@@ -145,28 +151,28 @@ const App: React.FC = () => {
         body: JSON.stringify({ employeePayments }),
       });
       if (!res.ok) throw new Error("Gagal proses payroll");
-      const newPayroll = await res.json();
-      setPayrolls(prev => [newPayroll, ...prev]);
-      setCurrentView('history');
+      const newPayroll: WeeklyPayroll = await res.json();
+      setPayrolls((prev) => [newPayroll, ...prev]);
+      setCurrentView("history");
     } catch (err) {
       console.error("Error process payroll:", err);
     }
   }, []);
 
-  const handleDeletePayroll = (id: string) => {
-    setItemToDelete({ id, type: 'payroll' });
+  const handleDeletePayroll = (id: number) => {
+    setItemToDelete({ id, type: "payroll" });
     setIsConfirmModalOpen(true);
   };
 
   const handleConfirmDelete = async () => {
     if (!itemToDelete) return;
     try {
-      if (itemToDelete.type === 'employee') {
+      if (itemToDelete.type === "employee") {
         await fetch(`/api/employees/${itemToDelete.id}`, { method: "DELETE" });
-        setEmployees(prev => prev.filter(e => e.id !== itemToDelete.id));
-      } else if (itemToDelete.type === 'payroll') {
+        setEmployees((prev) => prev.filter((e) => e.id !== itemToDelete.id));
+      } else if (itemToDelete.type === "payroll") {
         await fetch(`/api/payrolls/${itemToDelete.id}`, { method: "DELETE" });
-        setPayrolls(prev => prev.filter(p => p.id !== itemToDelete.id));
+        setPayrolls((prev) => prev.filter((p) => p.id !== itemToDelete.id));
       }
     } catch (err) {
       console.error("Error delete:", err);
@@ -178,24 +184,40 @@ const App: React.FC = () => {
 
   const renderView = () => {
     switch (currentView) {
-      case 'dashboard':
-        return <Dashboard
-          employees={employees}
-          payrolls={payrolls}
-          onAddEmployee={handleOpenAddModal}
-          onEditEmployee={handleOpenEditModal}
-          onDeleteEmployee={handleDeleteEmployee} />;
-      case 'calculator':
-        return <PayrollCalculator employees={employees} onProcessPayroll={handleProcessPayroll} />;
-      case 'history':
-        return <PayrollHistory payrolls={payrolls} onDeletePayroll={handleDeletePayroll} />;
+      case "dashboard":
+        return (
+          <Dashboard
+            employees={employees}
+            payrolls={payrolls}
+            onAddEmployee={handleOpenAddModal}
+            onEditEmployee={handleOpenEditModal}
+            onDeleteEmployee={handleDeleteEmployee}
+          />
+        );
+      case "calculator":
+        return (
+          <PayrollCalculator
+            employees={employees}
+            onProcessPayroll={handleProcessPayroll}
+          />
+        );
+      case "history":
+        return (
+          <PayrollHistory
+            payrolls={payrolls}
+            onDeletePayroll={handleDeletePayroll}
+          />
+        );
       default:
-        return <Dashboard
-          employees={employees}
-          payrolls={payrolls}
-          onAddEmployee={handleOpenAddModal}
-          onEditEmployee={handleOpenEditModal}
-          onDeleteEmployee={handleDeleteEmployee} />;
+        return (
+          <Dashboard
+            employees={employees}
+            payrolls={payrolls}
+            onAddEmployee={handleOpenAddModal}
+            onEditEmployee={handleOpenEditModal}
+            onDeleteEmployee={handleDeleteEmployee}
+          />
+        );
     }
   };
 
@@ -203,23 +225,28 @@ const App: React.FC = () => {
     <ErrorBoundary>
       <div className="min-h-screen bg-slate-100 font-sans">
         <div className="max-w-md mx-auto bg-white shadow-lg min-h-screen pb-20">
-          <header className="bg-brand-primary text-white p-4 shadow-md">
+          <header className="bg-indigo-600 text-white p-4 shadow-md">
             <h1 className="text-2xl font-bold text-center">Payroll App</h1>
           </header>
-          <main className="p-4">
-            {renderView()}
-          </main>
+          <main className="p-4">{renderView()}</main>
           <BottomNav currentView={currentView} setCurrentView={setCurrentView} />
         </div>
+
+        {/* Modal Add/Edit */}
         {isModalOpen && (
           <EmployeeFormModal
             isOpen={isModalOpen}
-            onClose={() => { setIsModalOpen(false); setEditingEmployee(null); }}
+            onClose={() => {
+              setIsModalOpen(false);
+              setEditingEmployee(null);
+            }}
             onAddEmployee={handleAddEmployee}
             onUpdateEmployee={handleUpdateEmployee}
             employeeToEdit={editingEmployee}
           />
         )}
+
+        {/* Modal Konfirmasi */}
         <ConfirmationModal
           isOpen={isConfirmModalOpen}
           onClose={() => {
@@ -233,6 +260,4 @@ const App: React.FC = () => {
       </div>
     </ErrorBoundary>
   );
-};
-
-export default App;
+}
