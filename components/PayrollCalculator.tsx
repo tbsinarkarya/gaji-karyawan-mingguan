@@ -58,7 +58,23 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
     const handleInputChange = (field: keyof typeof currentInputs, value: string) => {
         if (field === 'daysWorked') {
             const newDays = parseInt(value, 10) || 0;
-            setCurrentInputs({ ...currentInputs, daysWorked: String(newDays) });
+            let newAllowance = currentInputs.totalAllowance;
+
+            if (selectedEmployee) {
+                if (newDays === 6) {
+                    // otomatis isi tunjangan dan disable input
+                    newAllowance = String(selectedEmployee.weekly_allowance);
+                } else {
+                    // kurang dari 6 hari → input manual
+                    newAllowance = '0';
+                }
+            }
+
+            setCurrentInputs({
+                ...currentInputs,
+                daysWorked: String(newDays),
+                totalAllowance: newAllowance,
+            });
         } else {
             setCurrentInputs({ ...currentInputs, [field]: parseRupiahInput(value) });
         }
@@ -106,6 +122,8 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
         () => stagedPayments.reduce((total, p) => total + p.totalPay, 0),
         [stagedPayments]
     );
+
+    const isAllowanceDisabled = parseInt(currentInputs.daysWorked, 10) === 6;
 
     return (
         <div className="space-y-6">
@@ -158,7 +176,8 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
                                             placeholder="cth: Rp 300.000"
                                             value={formatRupiahInput(currentInputs.totalAllowance)}
                                             onChange={e => handleInputChange('totalAllowance', e.target.value)}
-                                            className="w-full pl-4 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent transition"
+                                            disabled={isAllowanceDisabled}
+                                            className="w-full pl-4 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent transition disabled:bg-slate-100 disabled:cursor-not-allowed"
                                         />
                                     </div>
                                     <div>
