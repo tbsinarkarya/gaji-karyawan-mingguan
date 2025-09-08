@@ -131,6 +131,7 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
 
             {employees.length > 0 ? (
                 <>
+                    {/* Pilih karyawan & input */}
                     <div className="bg-white p-4 rounded-lg shadow-sm space-y-4">
                         <h3 className="font-semibold text-slate-800">1. Pilih Karyawan & Input Data</h3>
                         <select
@@ -203,46 +204,54 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
                         )}
                     </div>
 
-                    {/* Preview Rincian Gaji */}
+                    {/* Preview Rincian Gaji dalam Tabel */}
                     {stagedPayments.length > 0 && (
-                        <div className="bg-white p-4 rounded-lg shadow-sm space-y-4">
-                            <h3 className="font-semibold text-slate-800">2. Daftar Gaji Siap Diproses</h3>
-                            <div className="space-y-3">
-                                {stagedPayments.map(p => {
-                                    const employee = employees.find(e => e.id === p.employeeId);
-                                    const basePay = (employee?.daily_rate || 0) * p.daysWorked;
-                                    return (
-                                        <div key={p.employeeId} className="bg-slate-50 p-3 rounded-md">
-                                            <div className="flex justify-between items-center">
-                                                <div>
-                                                    <p className="font-semibold text-slate-800">{p.employeeName}</p>
-                                                    <p className="text-sm text-slate-500">
-                                                        {p.daysWorked} hari × {formatCurrency(employee?.daily_rate || 0)} = {formatCurrency(basePay)}
-                                                    </p>
-                                                </div>
-                                                <button
-                                                    onClick={() => handleRemoveFromStaged(p.employeeId)}
-                                                    className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                                                >
-                                                    <TrashIcon />
-                                                </button>
-                                            </div>
-                                            <div className="grid grid-cols-3 mt-2 text-sm text-slate-600">
-                                                <div>+ Tunjangan: {formatCurrency(p.totalAllowance)}</div>
-                                                <div>- Pinjaman: {formatCurrency(p.loanDeduction)}</div>
-                                                <div className="font-semibold">Total: {formatCurrency(p.totalPay)}</div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                        <div className="bg-white p-4 rounded-lg shadow-sm">
+                            <h3 className="font-semibold text-slate-800 mb-2">2. Daftar Gaji Siap Diproses</h3>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-100">
+                                            <th className="px-2 py-1 border">Karyawan</th>
+                                            <th className="px-2 py-1 border">Hari × Gaji/Hari</th>
+                                            <th className="px-2 py-1 border">Tunjangan</th>
+                                            <th className="px-2 py-1 border">Pinjaman</th>
+                                            <th className="px-2 py-1 border">Total Gaji</th>
+                                            <th className="px-2 py-1 border">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {stagedPayments.map(p => {
+                                            const employee = employees.find(e => e.id === p.employeeId);
+                                            const basePay = (employee?.daily_rate || 0) * p.daysWorked;
+                                            return (
+                                                <tr key={p.employeeId} className="odd:bg-slate-50">
+                                                    <td className="px-2 py-1 border font-semibold">{p.employeeName}</td>
+                                                    <td className="px-2 py-1 border">{p.daysWorked} × {formatCurrency(employee?.daily_rate || 0)} = {formatCurrency(basePay)}</td>
+                                                    <td className="px-2 py-1 border">{formatCurrency(p.totalAllowance)}</td>
+                                                    <td className="px-2 py-1 border">{formatCurrency(p.loanDeduction)}</td>
+                                                    <td className="px-2 py-1 border font-semibold">{formatCurrency(p.totalPay)}</td>
+                                                    <td className="px-2 py-1 border text-center">
+                                                        <button
+                                                            onClick={() => handleRemoveFromStaged(p.employeeId)}
+                                                            className="p-1 text-slate-500 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                                                        >
+                                                            <TrashIcon />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
                             </div>
-                            <div className="border-t border-slate-200 pt-3 mt-3 flex justify-between items-center">
-                                <span className="font-semibold text-slate-700">Total Semua</span>
-                                <span className="font-bold text-lg text-slate-800">{formatCurrency(totalStagedPayroll)}</span>
+                            <div className="border-t border-slate-200 pt-3 mt-3 flex justify-between items-center font-semibold text-slate-700">
+                                <span>Total Semua</span>
+                                <span>{formatCurrency(totalStagedPayroll)}</span>
                             </div>
                             <button
                                 onClick={handleSubmit}
-                                className="w-full bg-brand-secondary hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg transition-colors text-lg"
+                                className="w-full bg-brand-secondary hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg transition-colors mt-3 text-lg"
                             >
                                 Proses Gaji ({stagedPayments.length} Karyawan)
                             </button>
