@@ -1,11 +1,9 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Employee } from '@/types';
 import TrashIcon from './icons/TrashIcon.tsx';
 
-const { useState, useMemo } = React;
-
 interface PayrollPayload {
-    employeeId: number; // sesuaikan dengan Employee.id
+    employeeId: number;
     daysWorked: number;
     totalAllowance: number;
     loanDeduction: number;
@@ -38,7 +36,7 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
     const [stagedPayments, setStagedPayments] = useState<StagedPayment[]>([]);
     const [currentInputs, setCurrentInputs] = useState({
         daysWorked: '',
-        totalAllowance: '',
+        totalAllowance: '0',
         loanDeduction: '0',
     });
 
@@ -54,21 +52,13 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
 
     const handleEmployeeSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
         setSelectedEmployeeId(Number(e.target.value));
-        setCurrentInputs({ daysWorked: '', totalAllowance: '', loanDeduction: '0' });
+        setCurrentInputs({ daysWorked: '', totalAllowance: '0', loanDeduction: '0' });
     };
 
     const handleInputChange = (field: keyof typeof currentInputs, value: string) => {
         if (field === 'daysWorked') {
-            const newDays = parseInt(value, 10);
-            let newAllowance = currentInputs.totalAllowance;
-
-            if (newDays === 6 && selectedEmployee) {
-                newAllowance = String(selectedEmployee.weekly_allowance);
-            } else if (newDays !== 6) {
-                newAllowance = '';
-            }
-
-            setCurrentInputs({ ...currentInputs, daysWorked: value, totalAllowance: newAllowance });
+            const newDays = parseInt(value, 10) || 0;
+            setCurrentInputs({ ...currentInputs, daysWorked: String(newDays) });
         } else {
             setCurrentInputs({ ...currentInputs, [field]: parseRupiahInput(value) });
         }
@@ -77,8 +67,9 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
     const handleAddToStaged = () => {
         if (!selectedEmployee) return alert('Silakan pilih karyawan terlebih dahulu.');
 
-        const daysWorked = parseInt(currentInputs.daysWorked, 10) || 0;
-        if (daysWorked <= 0 || daysWorked > 7) return alert('Jumlah hari kerja harus antara 1 dan 7.');
+        const daysWorked = parseInt(currentInputs.daysWorked, 10);
+        if (!daysWorked || daysWorked < 1 || daysWorked > 7)
+            return alert('Jumlah hari kerja harus antara 1 dan 7.');
 
         const totalAllowance = parseInt(currentInputs.totalAllowance, 10) || 0;
         const loanDeduction = parseInt(currentInputs.loanDeduction, 10) || 0;
@@ -97,7 +88,7 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
 
         setStagedPayments(prev => [...prev, newPayment].sort((a, b) => a.employeeName.localeCompare(b.employeeName)));
         setSelectedEmployeeId(null);
-        setCurrentInputs({ daysWorked: '', totalAllowance: '', loanDeduction: '0' });
+        setCurrentInputs({ daysWorked: '', totalAllowance: '0', loanDeduction: '0' });
     };
 
     const handleRemoveFromStaged = (employeeId: number) => {
@@ -115,8 +106,6 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
         () => stagedPayments.reduce((total, p) => total + p.totalPay, 0),
         [stagedPayments]
     );
-
-    const isAllowanceDisabled = parseInt(currentInputs.daysWorked, 10) === 6;
 
     return (
         <div className="space-y-6">
@@ -147,7 +136,6 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
                                     </div>
                                 </div>
 
-                                {/* Input fields */}
                                 <div>
                                     <label className="text-xs text-slate-500 font-medium ml-1 mb-1 block">Hari Kerja</label>
                                     <input
@@ -160,6 +148,7 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
                                         max={7}
                                     />
                                 </div>
+
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="text-xs text-slate-500 font-medium ml-1 mb-1 block">Total Tunjangan</label>
@@ -169,8 +158,7 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
                                             placeholder="cth: Rp 300.000"
                                             value={formatRupiahInput(currentInputs.totalAllowance)}
                                             onChange={e => handleInputChange('totalAllowance', e.target.value)}
-                                            disabled={isAllowanceDisabled}
-                                            className="w-full pl-4 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent transition disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                            className="w-full pl-4 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent transition"
                                         />
                                     </div>
                                     <div>
@@ -186,7 +174,10 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
                                     </div>
                                 </div>
 
-                                <button onClick={handleAddToStaged} className="w-full bg-brand-primary hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                                <button
+                                    onClick={handleAddToStaged}
+                                    className="w-full bg-brand-primary hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                                >
                                     Tambahkan ke Daftar Gaji
                                 </button>
                             </div>
@@ -203,7 +194,10 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
                                             <p className="font-semibold text-slate-800">{p.employeeName}</p>
                                             <p className="text-sm text-brand-secondary font-medium">{formatCurrency(p.totalPay)}</p>
                                         </div>
-                                        <button onClick={() => handleRemoveFromStaged(p.employeeId)} className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">
+                                        <button
+                                            onClick={() => handleRemoveFromStaged(p.employeeId)}
+                                            className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                                        >
                                             <TrashIcon />
                                         </button>
                                     </div>
@@ -213,7 +207,10 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
                                 <span className="font-semibold text-slate-700">Total</span>
                                 <span className="font-bold text-lg text-slate-800">{formatCurrency(totalStagedPayroll)}</span>
                             </div>
-                            <button onClick={handleSubmit} className="w-full bg-brand-secondary hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg transition-colors text-lg">
+                            <button
+                                onClick={handleSubmit}
+                                className="w-full bg-brand-secondary hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg transition-colors text-lg"
+                            >
                                 Proses Gaji ({stagedPayments.length} Karyawan)
                             </button>
                         </div>
