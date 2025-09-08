@@ -36,7 +36,7 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
     const [stagedPayments, setStagedPayments] = useState<StagedPayment[]>([]);
     const [currentInputs, setCurrentInputs] = useState({
         daysWorked: '',
-        totalAllowance: '0',
+        totalAllowance: '',
         loanDeduction: '0',
     });
 
@@ -52,29 +52,21 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
 
     const handleEmployeeSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
         setSelectedEmployeeId(Number(e.target.value));
-        setCurrentInputs({ daysWorked: '', totalAllowance: '0', loanDeduction: '0' });
+        setCurrentInputs({ daysWorked: '', totalAllowance: '', loanDeduction: '0' });
     };
 
     const handleInputChange = (field: keyof typeof currentInputs, value: string) => {
         if (field === 'daysWorked') {
-            const newDays = parseInt(value, 10) || 0;
+            const newDays = parseInt(value, 10);
             let newAllowance = currentInputs.totalAllowance;
 
-            if (selectedEmployee) {
-                if (newDays === 6) {
-                    // otomatis isi tunjangan dan disable input
-                    newAllowance = String(selectedEmployee.weekly_allowance);
-                } else {
-                    // kurang dari 6 hari → input manual
-                    newAllowance = '0';
-                }
+            if (newDays === 6 && selectedEmployee) {
+                newAllowance = String(selectedEmployee.weekly_allowance);
+            } else if (newDays !== 6) {
+                newAllowance = '';
             }
 
-            setCurrentInputs({
-                ...currentInputs,
-                daysWorked: String(newDays),
-                totalAllowance: newAllowance,
-            });
+            setCurrentInputs({ ...currentInputs, daysWorked: value, totalAllowance: newAllowance });
         } else {
             setCurrentInputs({ ...currentInputs, [field]: parseRupiahInput(value) });
         }
@@ -83,9 +75,8 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
     const handleAddToStaged = () => {
         if (!selectedEmployee) return alert('Silakan pilih karyawan terlebih dahulu.');
 
-        const daysWorked = parseInt(currentInputs.daysWorked, 10);
-        if (!daysWorked || daysWorked < 1 || daysWorked > 7)
-            return alert('Jumlah hari kerja harus antara 1 dan 7.');
+        const daysWorked = parseInt(currentInputs.daysWorked, 10) || 0;
+        if (daysWorked <= 0 || daysWorked > 7) return alert('Jumlah hari kerja harus antara 1 dan 7.');
 
         const totalAllowance = parseInt(currentInputs.totalAllowance, 10) || 0;
         const loanDeduction = parseInt(currentInputs.loanDeduction, 10) || 0;
@@ -104,7 +95,7 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
 
         setStagedPayments(prev => [...prev, newPayment].sort((a, b) => a.employeeName.localeCompare(b.employeeName)));
         setSelectedEmployeeId(null);
-        setCurrentInputs({ daysWorked: '', totalAllowance: '0', loanDeduction: '0' });
+        setCurrentInputs({ daysWorked: '', totalAllowance: '', loanDeduction: '0' });
     };
 
     const handleRemoveFromStaged = (employeeId: number) => {
@@ -131,7 +122,6 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
 
             {employees.length > 0 ? (
                 <>
-                    {/* Pilih karyawan & input */}
                     <div className="bg-white p-4 rounded-lg shadow-sm space-y-4">
                         <h3 className="font-semibold text-slate-800">1. Pilih Karyawan & Input Data</h3>
                         <select
@@ -194,30 +184,27 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
                                     </div>
                                 </div>
 
-                                <button
-                                    onClick={handleAddToStaged}
-                                    className="w-full bg-brand-primary hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
-                                >
+                                <button onClick={handleAddToStaged} className="w-full bg-brand-primary hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
                                     Tambahkan ke Daftar Gaji
                                 </button>
                             </div>
                         )}
                     </div>
 
-                    {/* Preview Rincian Gaji dalam Tabel */}
                     {stagedPayments.length > 0 && (
-                        <div className="bg-white p-4 rounded-lg shadow-sm">
-                            <h3 className="font-semibold text-slate-800 mb-2">2. Daftar Gaji Siap Diproses</h3>
+                        <div className="bg-white p-4 rounded-lg shadow-sm space-y-4">
+                            <h3 className="font-semibold text-slate-800">2. Preview Rincian Gaji</h3>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm text-left border-collapse">
                                     <thead>
-                                        <tr className="bg-slate-100">
-                                            <th className="px-2 py-1 border">Karyawan</th>
-                                            <th className="px-2 py-1 border">Hari × Gaji/Hari</th>
-                                            <th className="px-2 py-1 border">Tunjangan</th>
-                                            <th className="px-2 py-1 border">Pinjaman</th>
-                                            <th className="px-2 py-1 border">Total Gaji</th>
-                                            <th className="px-2 py-1 border">Aksi</th>
+                                        <tr className="border-b">
+                                            <th className="py-2 px-2">Nama</th>
+                                            <th className="py-2 px-2">Hari Kerja</th>
+                                            <th className="py-2 px-2">Gaji Pokok</th>
+                                            <th className="py-2 px-2">Tunjangan</th>
+                                            <th className="py-2 px-2">Potongan</th>
+                                            <th className="py-2 px-2">Total</th>
+                                            <th className="py-2 px-2">Hapus</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -225,17 +212,15 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
                                             const employee = employees.find(e => e.id === p.employeeId);
                                             const basePay = (employee?.daily_rate || 0) * p.daysWorked;
                                             return (
-                                                <tr key={p.employeeId} className="odd:bg-slate-50">
-                                                    <td className="px-2 py-1 border font-semibold">{p.employeeName}</td>
-                                                    <td className="px-2 py-1 border">{p.daysWorked} × {formatCurrency(employee?.daily_rate || 0)} = {formatCurrency(basePay)}</td>
-                                                    <td className="px-2 py-1 border">{formatCurrency(p.totalAllowance)}</td>
-                                                    <td className="px-2 py-1 border">{formatCurrency(p.loanDeduction)}</td>
-                                                    <td className="px-2 py-1 border font-semibold">{formatCurrency(p.totalPay)}</td>
-                                                    <td className="px-2 py-1 border text-center">
-                                                        <button
-                                                            onClick={() => handleRemoveFromStaged(p.employeeId)}
-                                                            className="p-1 text-slate-500 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                                                        >
+                                                <tr key={p.employeeId} className="border-b">
+                                                    <td className="py-1 px-2">{p.employeeName}</td>
+                                                    <td className="py-1 px-2">{p.daysWorked}</td>
+                                                    <td className="py-1 px-2">{formatCurrency(basePay)}</td>
+                                                    <td className="py-1 px-2">{formatCurrency(p.totalAllowance)}</td>
+                                                    <td className="py-1 px-2">{formatCurrency(p.loanDeduction)}</td>
+                                                    <td className="py-1 px-2 font-bold">{formatCurrency(p.totalPay)}</td>
+                                                    <td className="py-1 px-2">
+                                                        <button onClick={() => handleRemoveFromStaged(p.employeeId)} className="p-1 text-red-500 hover:text-red-700">
                                                             <TrashIcon />
                                                         </button>
                                                     </td>
@@ -245,14 +230,13 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
                                     </tbody>
                                 </table>
                             </div>
-                            <div className="border-t border-slate-200 pt-3 mt-3 flex justify-between items-center font-semibold text-slate-700">
-                                <span>Total Semua</span>
-                                <span>{formatCurrency(totalStagedPayroll)}</span>
+
+                            <div className="border-t border-slate-200 pt-3 mt-3 flex justify-between items-center">
+                                <span className="font-semibold text-slate-700">Total</span>
+                                <span className="font-bold text-lg text-slate-800">{formatCurrency(totalStagedPayroll)}</span>
                             </div>
-                            <button
-                                onClick={handleSubmit}
-                                className="w-full bg-brand-secondary hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg transition-colors mt-3 text-lg"
-                            >
+
+                            <button onClick={handleSubmit} className="w-full bg-brand-secondary hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg transition-colors text-lg">
                                 Proses Gaji ({stagedPayments.length} Karyawan)
                             </button>
                         </div>
