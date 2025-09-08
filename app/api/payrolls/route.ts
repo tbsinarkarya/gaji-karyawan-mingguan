@@ -1,74 +1,73 @@
 import { Pool } from "pg";
+import { NextResponse } from "next/server";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 
-// ✅ GET semua payroll
+// ✅ Ambil semua payroll
 export async function GET() {
   try {
     const result = await pool.query(
-      `SELECT p.*, e.name, e.position 
-       FROM payroll p 
+      `SELECT p.*, e.name as employee_name
+       FROM payroll p
        JOIN employees e ON p.employee_id = e.id
        ORDER BY p.id DESC`
     );
-    return Response.json(result.rows);
+    return NextResponse.json(result.rows);
   } catch (error) {
-    console.error("GET /api/payroll error:", error);
-    return new Response("Database read error", { status: 500 });
+    console.error("GET /api/payrolls error:", error);
+    return new NextResponse("Database read error", { status: 500 });
   }
 }
 
-// ✅ POST tambah payroll baru
+// ✅ Simpan payroll baru
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { employee_id, week_start, week_end, total_days, total_salary } = body;
+    const { employeePayments } = body;
 
-    if (!employee_id || !week_start || !week_end || !total_days || !total_salary) {
-      return new Response("Semua field wajib diisi", { status: 400 });
+    if (!Array.isArray(employeePayments) || employeePayments.length === 0) {
+      return new NextResponse("employeePayments is required", { status: 400 });
     }
 
-    const result = await pool.query(
-      `INSERT INTO payroll (employee_id, week_start, week_end, total_days, total_salary) 
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [employee_id, week_start, week_end, total_days, total_salary]
-    );
+    const saved: any[] = [];
 
-    return Response.json(result.rows[0], { status: 201 });
-  } catch (error: any) {
-    console.error("POST /api/payroll error:", error);
-    if (error.code === "23505") {
-      return new Response("Payroll untuk periode ini sudah ada", { status: 400 });
-    }
-    return new Response("Database insert error", { status: 500 });
-  }
-}
+    for (const p of employeePayments) {
+      const { employeeId, daysWorked, totalAllowance, loanDeduction } = p;
 
-// ✅ DELETE payroll
-export async function DELETE(req: Request) {
-  try {
-    const body = await req.json();
-    const { id } = body;
+      // hitung total gaji
+      const empRes = await pool.query(
+        "SELECT daily_rate, weekly_allowance FROM employees WHERE id = $1",
+        [employeeId]
+      );
 
-    if (!id) {
-      return new Response("Payroll ID is required", { status: 400 });
-    }
+      if (empRes.rows.length === 0) continue;
+      const emp = empRes.rows[0];
 
-    const result = await pool.query(
-      `DELETE FROM payroll WHERE id = $1 RETURNING *`,
-      [id]
-    );
+      const total_salary =
+        daysWorked * emp.daily_rate +
+        emp.weekly_allowance +
+        (totalAllowance || 0) -
+        (loanDeduction || 0);
 
-    if (result.rows.length === 0) {
-      return new Response("Payroll not found", { status: 404 });
+      const week_start = new Date(); // bisa kamu sesuaikan
+      const week_end = new Date();
+      week_end.setDate(week_start.getDate() + 6);
+
+      const insertRes = await pool.query(
+        `INSERT INTO payroll (employee_id, week_start, week_end, total_days, total_salary)
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [employeeId, week_start, week_end, daysWorked, total_salary]
+      );
+
+      saved.push(insertRes.rows[0]);
     }
 
-    return Response.json({ success: true, deleted: result.rows[0] });
+    return NextResponse.json(saved, { status: 201 });
   } catch (error) {
-    console.error("DELETE /api/payroll error:", error);
-    return new Response("Database delete error", { status: 500 });
+    console.error("POST /api/payrolls error:", error);
+    return new NextResponse("Database insert error", { status: 500 });
   }
 }
