@@ -101,6 +101,26 @@ function openWhatsApp(message: string, preferred?: "consumer" | "business") {
   window.open(`https://api.whatsapp.com/send?text=${encoded}`, "_blank");
 }
 
+function sanitizeWAHeader(msg: string) {
+  const header = '🧾 *Slip Gaji Mingguan*\\n\\n';
+  let out = msg;
+  if (!out.startsWith(header)) {
+    const sep = out.indexOf('\\n\\n');
+    out = header + (sep >= 0 ? out.slice(sep + 2) : out);
+  }
+  const after = out.slice(header.length);
+  const afterTrim = after.trimStart();
+  const startsDup = afterTrim.startsWith('Slip Gaji Mingguan')
+    || afterTrim.startsWith('🧾 Slip Gaji Mingguan')
+    || afterTrim.startsWith('ð')
+    || afterTrim.startsWith('*Slip Gaji Mingguan*');
+  if (startsDup) {
+    const nl = after.indexOf('\\n');
+    if (nl >= 0) out = header + after.slice(nl + 2);
+  }
+  return out;
+}
+
 type WAChoice = "consumer" | "business";
 
 // ============ CETAK PER KARYAWAN (BARU) ============
@@ -206,7 +226,7 @@ const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
     // Force a clean header and drop any mojibake prefix
     const _header = '🧾 *Slip Gaji Mingguan*\\n\\n';
     message = _header + message.replace(/^.*?\\n\\n/, '');
-    return message;
+    return sanitizeWAHeader(message);
   };
 
 // Share WhatsApp satu periode (semua karyawan)
@@ -232,7 +252,7 @@ const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
     // Force a clean header and drop any mojibake prefix
     const _header = '🧾 *Slip Gaji Mingguan*\\n\\n';
     message = _header + message.replace(/^.*?\\n\\n/, '');
-    return message;
+    return sanitizeWAHeader(message);
   };
 
 const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayroll }) => {
