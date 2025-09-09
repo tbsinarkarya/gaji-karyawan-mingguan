@@ -13,8 +13,18 @@ export async function POST(req: Request) {
     const user = await verifyLogin(u, p);
     if (!user) return new NextResponse("Invalid credentials", { status: 401 });
 
-    await createSession(user.id);
-    return NextResponse.json({ id: user.id, username: user.username, role: user.role });
+    const session = await createSession(user.id);
+    const res = NextResponse.json({ id: user.id, username: user.username, role: user.role });
+    res.cookies.set({
+      name: "session",
+      value: session.value,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      expires: session.expires,
+    });
+    return res;
   } catch (err) {
     console.error("POST /api/auth/login error:", err);
     return new NextResponse("Login failed", { status: 500 });

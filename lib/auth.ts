@@ -20,15 +20,8 @@ export async function createSession(userId: number) {
     `INSERT INTO sessions (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
     [userId, tokenHash, expiresAt.toISOString()]
   );
-  ;(await cookies()).set({
-    name: SESSION_COOKIE,
-    value: raw,
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    expires: expiresAt,
-  });
+  // Return the cookie payload; set it in the Route Handler response
+  return { value: raw, expires: expiresAt } as const;
 }
 
 export async function destroySession() {
@@ -39,7 +32,7 @@ export async function destroySession() {
     const tokenHash = hashToken(raw);
     await pool.query(`DELETE FROM sessions WHERE token_hash = $1`, [tokenHash]);
   }
-  ;(await cookies()).set({ name: SESSION_COOKIE, value: "", path: "/", expires: new Date(0) });
+  // Route Handler should clear the cookie on the response
 }
 
 export type CurrentUser = { id: number; username: string; role: string } | null;
