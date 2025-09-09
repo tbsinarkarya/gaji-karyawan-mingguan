@@ -101,19 +101,25 @@ function openWhatsApp(message: string, preferred?: "consumer" | "business") {
   window.open(`https://api.whatsapp.com/send?text=${encoded}`, "_blank");
 }
 
+// ============ Perbaikan di sini ============
+// Gunakan newline asli, dan normalisasi literal "\n" menjadi newline
 function sanitizeWAHeader(msg: string) {
-  const header = '*Slip Gaji Mingguan*\\n\\n';
-  let out = msg;
+  const header = '*Slip Gaji Mingguan*\n\n';
+  // normalisasi: CRLF -> LF dan literal "\n" -> newline
+  let out = (msg ?? "").replace(/\r\n/g, '\n').replace(/\\n/g, '\n');
+
   if (!out.startsWith(header)) {
-    const sep = out.indexOf('\\n\\n');
+    const sep = out.indexOf('\n\n');
     out = header + (sep >= 0 ? out.slice(sep + 2) : out);
   }
   const after = out.slice(header.length);
   const afterTrim = after.trimStart();
-  const startsDup = afterTrim.startsWith('Slip Gaji Mingguan')
-    || afterTrim.startsWith('🧾 Slip Gaji Mingguan')
-    || afterTrim.startsWith('ð')
-    || afterTrim.startsWith('*Slip Gaji Mingguan*');
+  const startsDup =
+    afterTrim.startsWith('Slip Gaji Mingguan') ||
+    afterTrim.startsWith('🧾 Slip Gaji Mingguan') ||
+    afterTrim.startsWith('ð') ||
+    afterTrim.startsWith('*Slip Gaji Mingguan*');
+
   if (startsDup) {
     out = header + after.replace(/^\*?\s*Slip Gaji Mingguan\*?\s*/i, '');
   }
@@ -207,14 +213,14 @@ const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
   w.document.close();
 };
 
-// ====== Build WhatsApp messages ======
-  const buildOneEmployeeWhatsAppMessage = (weekStart: string, weekEnd: string, p: any) => {
+// ====== Build WhatsApp messages (Perbaikan newline) ======
+const buildOneEmployeeWhatsAppMessage = (weekStart: string, weekEnd: string, p: any) => {
   const totalAllowance = Number(p.totalAllowance ?? 0);
   const extraAllowance = Number(p.extraAllowance ?? 0);
   const loanDeduction = Number(p.loanDeduction ?? 0);
 
   let message = `*Slip Gaji Mingguan*\n\n`;
-message += `*Periode:* ${formatDateRange(weekStart, weekEnd)}\n\n`;
+  message += `*Periode:* ${formatDateRange(weekStart, weekEnd)}\n\n`;
   message += `*Nama:* ${p.employeeName}\n*Jabatan:* ${p.position}\n*Hari Kerja:* ${p.daysWorked} hari\n`;
   message += `*Gaji Pokok:* ${formatCurrency(p.basePay)}\n`;
   message += `*Tunjangan:* ${formatCurrency(totalAllowance)}\n`;
@@ -222,16 +228,16 @@ message += `*Periode:* ${formatDateRange(weekStart, weekEnd)}\n\n`;
   if (loanDeduction > 0) message += `*Potongan:* -${formatCurrency(loanDeduction)}\n`;
   message += `*Total Diterima:* *${formatCurrency(p.totalPay)}*\n`;
 
-    // Force a clean header and drop any mojibake prefix
-    const _header = '*Slip Gaji Mingguan*\\n\\n';
-    message = _header + message.replace(/^.*?\\n\\n/, '');
-    return sanitizeWAHeader(message);
-  };
+  // Force a clean header and drop any mojibake prefix
+  const _header = '*Slip Gaji Mingguan*\n\n';
+  message = _header + message.replace(/^.*?\n\n/, '');
+  return sanitizeWAHeader(message);
+};
 
 // Share WhatsApp satu periode (semua karyawan)
-  const buildWholePayrollWhatsAppMessage = (payroll: WeeklyPayroll) => {
+const buildWholePayrollWhatsAppMessage = (payroll: WeeklyPayroll) => {
   let message = `*Slip Gaji Mingguan*\n\n`;
-message += `*Periode:* ${formatDateRange(payroll.weekStartDate, payroll.weekEndDate)}\n`;
+  message += `*Periode:* ${formatDateRange(payroll.weekStartDate, payroll.weekEndDate)}\n`;
   message += `*Total Gaji Dibayarkan:* ${formatCurrency(payroll.totalPayroll)}\n\n`;
   message += `*Rincian Karyawan:*\n-----------------------------------\n`;
 
@@ -248,11 +254,10 @@ message += `*Periode:* ${formatDateRange(payroll.weekStartDate, payroll.weekEndD
     message += `*Total Diterima:* *${formatCurrency(p.totalPay)}*\n-----------------------------------\n`;
   });
 
-    // Force a clean header and drop any mojibake prefix
-    const _header = '*Slip Gaji Mingguan*\\n\\n';
-    message = _header + message.replace(/^.*?\\n\\n/, '');
-    return sanitizeWAHeader(message);
-  };
+  const _header = '*Slip Gaji Mingguan*\n\n';
+  message = _header + message.replace(/^.*?\n\n/, '');
+  return sanitizeWAHeader(message);
+};
 
 const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayroll }) => {
   const [list, setList] = useState<WeeklyPayroll[]>(payrolls);
@@ -321,7 +326,7 @@ const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayro
       );
   }, [list]);
 
-return (
+  return (
     <div className="space-y-6">
       <WhatsAppChoiceModal
         isOpen={waChooserOpen}
@@ -335,20 +340,7 @@ return (
           setWaMessage(null);
         }}
       />
-      <WhatsAppChoiceModal
-        isOpen={waChooserOpen}
-        onClose={() => {
-          setWaChooserOpen(false);
-          setWaMessage(null);
-        }}
-        onChoose={(choice: WAChoice) => {
-          if (waMessage) {
-            openWhatsApp(waMessage, choice);
-          }
-          setWaChooserOpen(false);
-          setWaMessage(null);
-        }}
-      />
+
       <div className="flex justify-between items-center mb-3">
         <h2 className="text-xl font-bold text-slate-700">Riwayat Gaji</h2>
       </div>
@@ -621,4 +613,3 @@ const MonthlySummaryCard: React.FC<{
     </div>
   );
 };
-
