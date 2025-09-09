@@ -1,220 +1,283 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Employee } from '@/types';
-import CameraIcon from './icons/CameraIcon.tsx';
+import TrashIcon from './icons/TrashIcon.tsx';
 
-const { useState, useEffect, useRef } = React;
-
-interface EmployeeFormModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onAddEmployee: (employee: Omit<Employee, 'id'>) => void;
-  onUpdateEmployee: (employee: Employee) => void;
-  employeeToEdit: Employee | null;
+interface PayrollPayload {
+  employeeId: number;
+  daysWorked: number;
+  totalAllowance: number;   // tunjangan (otomatis saat 6 hari / manual saat <6)
+  extraAllowance: number;   // Tunjangan Lain (THR/bonus), selalu manual
+  loanDeduction: number;
 }
 
-const formatRupiahInput = (value: string): string => {
-  if (!value) return '';
-  const numberString = value.replace(/[^0-9]/g, '');
-  if (!numberString) return '';
-  const formatted = new Intl.NumberFormat('id-ID').format(parseInt(numberString, 10));
-  return `Rp ${formatted}`;
+interface PayrollCalculatorProps {
+  employees: Employee[];
+  onProcessPayroll: (employeePayments: PayrollPayload[]) => void;
+}
+
+interface StagedPayment extends PayrollPayload {
+  employeeName: string;
+  totalPay: number;
+}
+
+// Format ke Rupiah untuk tampilan
+const formatRupiah = (value: number): string => {
+  return value === 0 ? 'Rp 0' : `Rp ${value.toLocaleString('id-ID')}`;
 };
 
-const parseRupiahInput = (value: string): string => value.replace(/[^0-9]/g, '');
+// Parsing dari input "Rp 80.000" ke angka
+const parseRupiah = (value: string): number => {
+  const numberString = value.replace(/[^0-9]/g, '');
+  return parseInt(numberString, 10) || 0;
+};
 
-const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
-  isOpen,
-  onClose,
-  onAddEmployee,
-  onUpdateEmployee,
-  employeeToEdit,
-}) => {
-  const [name, setName] = useState('');
-  const [position, setPosition] = useState('');
-  const [daily_rate, setDailyRate] = useState('');
-  const [weekly_allowance, setWeeklyAllowance] = useState('');
-  const [image_url, setImageUrl] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProcessPayroll }) => {
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
+  const [stagedPayments, setStagedPayments] = useState<StagedPayment[]>([]);
+  const [currentInputs, setCurrentInputs] = useState({
+    daysWorked: '',
+    totalAllowance: '',   // auto saat 6 hari
+    extraAllowance: '',   // manual selalu
+    loanDeduction: '0',
+  });
 
-  useEffect(() => {
-    if (employeeToEdit) {
-      setName(employeeToEdit.name);
-      setPosition(employeeToEdit.position);
-      setDailyRate(String(employeeToEdit.daily_rate));
-      setWeeklyAllowance(String(employeeToEdit.weekly_allowance));
-      setImageUrl(employeeToEdit.image_url);
+  const selectedEmployee = useMemo(
+    () => employees.find(e => e.id === selectedEmployeeId),
+    [selectedEmployeeId, employees]
+  );
+
+  const availableEmployees = useMemo(
+    () => employees.filter(e => !stagedPayments.some(p => p.employeeId === e.id)),
+    [employees, stagedPayments]
+  );
+
+  const handleEmployeeSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedEmployeeId(Number(e.target.value));
+    setCurrentInputs({ daysWorked: '', totalAllowance: '', extraAllowance: '', loanDeduction: '0' });
+  };
+
+  const handleInputChange = (field: keyof typeof currentInputs, value: string) => {
+    if (field === 'daysWorked') {
+      const days = parseInt(value, 10);
+      let allowance = currentInputs.totalAllowance;
+
+      if (days === 6 && selectedEmployee) {
+        allowance = (selectedEmployee.weekly_allowance ?? 0).toString();
+      } else if (days !== 6) {
+        allowance = '';
+      }
+
+      setCurrentInputs({ ...currentInputs, daysWorked: value, totalAllowance: allowance });
     } else {
-      setName('');
-      setPosition('');
-      setDailyRate('');
-      setWeeklyAllowance('');
-      setImageUrl(null);
-    }
-  }, [employeeToEdit]);
-
-  const handleImageUploadClick = () => fileInputRef.current?.click();
-
-  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setImageUrl(reader.result as string);
-      reader.readAsDataURL(file);
+      // simpan sebagai string numeric tanpa simbol; formatting dilakukan saat render value
+      setCurrentInputs({ ...currentInputs, [field]: parseRupiah(value).toString() });
     }
   };
 
-  if (!isOpen) return null;
+  const handleAddToStaged = () => {
+    if (!selectedEmployee) return alert('Silakan pilih karyawan terlebih dahulu.');
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+    const daysWorked = parseInt(currentInputs.daysWorked, 10) || 0;
+    if (daysWorked <= 0 || daysWorked > 7) return alert('Jumlah hari kerja harus antara 1 dan 7.');
 
-    const rateValue = parseRupiahInput(daily_rate);
-    const allowanceValue = parseRupiahInput(weekly_allowance);
+    const totalAllowance = parseRupiah(currentInputs.totalAllowance);
+    const extraAllowance = parseRupiah(currentInputs.extraAllowance);
+    const loanDeduction = parseRupiah(currentInputs.loanDeduction);
 
-    if (!name || !position || !rateValue || !allowanceValue) {
-      alert('Semua field harus diisi!');
-      return;
-    }
+    const basePay = (selectedEmployee.daily_rate ?? 0) * daysWorked;
+    const totalPay = basePay + totalAllowance + extraAllowance - loanDeduction;
 
-    const rate = parseFloat(rateValue);
-    const allowance = parseFloat(allowanceValue);
-
-    if (isNaN(rate) || rate <= 0 || isNaN(allowance) || allowance < 0) {
-      alert('Gaji dan Tunjangan harus berupa angka yang valid.');
-      return;
-    }
-
-    const employeeData: Omit<Employee, 'id'> = {
-      name,
-      position,
-      daily_rate: rate,
-      weekly_allowance: allowance,
-      image_url: image_url || '',
-      created_at: new Date().toISOString(),
+    const newPayment: StagedPayment = {
+      employeeId: selectedEmployee.id,
+      employeeName: selectedEmployee.name,
+      daysWorked,
+      totalAllowance,
+      extraAllowance,
+      loanDeduction,
+      totalPay,
     };
 
-    if (employeeToEdit) {
-      onUpdateEmployee({ ...employeeToEdit, ...employeeData });
-    } else {
-      onAddEmployee(employeeData);
-    }
+    setStagedPayments(prev => [...prev, newPayment].sort((a, b) => a.employeeName.localeCompare(b.employeeName)));
+    setSelectedEmployeeId(null);
+    setCurrentInputs({ daysWorked: '', totalAllowance: '', extraAllowance: '', loanDeduction: '0' });
   };
 
+  const handleRemoveFromStaged = (employeeId: number) => {
+    setStagedPayments(prev => prev.filter(p => p.employeeId !== employeeId));
+  };
+
+  const handleSubmit = () => {
+    if (stagedPayments.length === 0) return alert('Tambahkan setidaknya satu karyawan ke daftar gaji.');
+    const payload: PayrollPayload[] = stagedPayments.map(({ employeeName, totalPay, ...rest }) => rest);
+    onProcessPayroll(payload);
+    setStagedPayments([]);
+  };
+
+  const totalStagedPayroll = useMemo(
+    () => stagedPayments.reduce((total, p) => total + p.totalPay, 0),
+    [stagedPayments]
+  );
+
+  const isAllowanceDisabled = parseInt(currentInputs.daysWorked, 10) === 6;
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
-        <div className="p-5 border-b">
-          <h2 className="text-xl font-bold text-slate-800">
-            {employeeToEdit ? 'Edit Karyawan' : 'Tambah Karyawan Baru'}
-          </h2>
+    <div className="space-y-6">
+      <h2 className="text-xl font-bold text-slate-700">Hitung Gaji Mingguan</h2>
+
+      {employees.length === 0 && (
+        <div className="text-center py-10 px-4 bg-slate-50 rounded-lg">
+          <p className="text-slate-500">Tidak ada karyawan.</p>
         </div>
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div className="flex justify-center">
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleImageChange}
-              className="hidden"
-              accept="image/*"
-            />
-            <button
-              type="button"
-              onClick={handleImageUploadClick}
-              className="relative w-24 h-24 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-300 transition-colors"
+      )}
+
+      {employees.length > 0 && (
+        <>
+          {/* Form Input */}
+          <div className="bg-white p-4 rounded-lg shadow-sm space-y-4">
+            <h3 className="font-semibold text-slate-800">1. Pilih Karyawan & Input Data</h3>
+            <select
+              value={selectedEmployeeId ?? ''}
+              onChange={handleEmployeeSelect}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
             >
-              {image_url ? (
-                <div className="relative w-full h-full">
-                  <img
-                    src={image_url}
-                    alt="Preview"
-                    className="w-full h-full rounded-full object-cover"
-                  />
-                  {/* Tombol Hapus Foto */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setImageUrl(null);
-                    }}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
-                    title="Hapus Foto"
-                  >
-                    ×
-                  </button>
+              <option value="">-- Pilih Karyawan --</option>
+              {availableEmployees.map(e => (
+                <option key={e.id} value={e.id}>{e.name}</option>
+              ))}
+            </select>
+
+            {selectedEmployee && (
+              <div className="border-t border-slate-200 pt-4 space-y-3">
+                <div className="flex items-center space-x-3">
+                  <img src={selectedEmployee.image_url || ''} alt={selectedEmployee.name} className="w-10 h-10 rounded-full object-cover" />
+                  <div>
+                    <p className="font-bold text-slate-800">{selectedEmployee.name}</p>
+                    <p className="text-sm text-slate-500">{formatRupiah(selectedEmployee.daily_rate)} / hari</p>
+                  </div>
                 </div>
-              ) : (
-                <CameraIcon className="w-10 h-10 text-slate-700" />
-              )}
-            </button>
+
+                {/* Input */}
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-slate-500 font-medium ml-1 mb-1 block">Hari Kerja</label>
+                    <input
+                      type="number"
+                      placeholder="Jumlah hari"
+                      value={currentInputs.daysWorked}
+                      onChange={e => handleInputChange('daysWorked', e.target.value)}
+                      className="w-full pl-4 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent transition"
+                      min={1}
+                      max={7}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-500 font-medium ml-1 mb-1 block">Tunjangan (Auto saat 6 hari)</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="cth: Rp 300.000"
+                        value={currentInputs.totalAllowance ? `Rp ${parseRupiah(currentInputs.totalAllowance).toLocaleString('id-ID')}` : ''}
+                        onChange={e => handleInputChange('totalAllowance', e.target.value)}
+                        disabled={isAllowanceDisabled}
+                        className="w-full pl-4 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent transition disabled:bg-slate-100 disabled:cursor-not-allowed"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 font-medium ml-1 mb-1 block">Tunjangan Lain (THR/Bonus)</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="cth: Rp 500.000"
+                        value={currentInputs.extraAllowance ? `Rp ${parseRupiah(currentInputs.extraAllowance).toLocaleString('id-ID')}` : ''}
+                        onChange={e => handleInputChange('extraAllowance', e.target.value)}
+                        className="w-full pl-4 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent transition"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 font-medium ml-1 mb-1 block">Potongan Pinjaman</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="cth: Rp 100.000"
+                        value={currentInputs.loanDeduction ? `Rp ${parseRupiah(currentInputs.loanDeduction).toLocaleString('id-ID')}` : 'Rp 0'}
+                        onChange={e => handleInputChange('loanDeduction', e.target.value)}
+                        className="w-full pl-4 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent transition"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleAddToStaged}
+                  className="w-full bg-brand-primary hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                >
+                  Tambahkan ke Daftar Gaji
+                </button>
+              </div>
+            )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Nama Lengkap</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary"
-              required
-            />
-          </div>
+          {/* Preview Gaji */}
+          {stagedPayments.length > 0 && (
+            <div className="bg-white p-4 rounded-lg shadow-sm space-y-4">
+              <h3 className="font-semibold text-slate-800">2. Preview Daftar Gaji</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left border border-slate-200 rounded-md">
+                  <thead className="bg-slate-100">
+                    <tr>
+                      <th className="p-2 border-b">Nama</th>
+                      <th className="p-2 border-b">Hari</th>
+                      <th className="p-2 border-b">Tunjangan</th>
+                      <th className="p-2 border-b">Tunjangan Lain</th>
+                      <th className="p-2 border-b">Potongan</th>
+                      <th className="p-2 border-b">Total Gaji</th>
+                      <th className="p-2 border-b">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stagedPayments.map(p => (
+                      <tr key={p.employeeId} className="border-b last:border-b-0">
+                        <td className="p-2">{p.employeeName}</td>
+                        <td className="p-2">{p.daysWorked}</td>
+                        <td className="p-2">{formatRupiah(p.totalAllowance)}</td>
+                        <td className="p-2">{formatRupiah(p.extraAllowance)}</td>
+                        <td className="p-2">{formatRupiah(p.loanDeduction)}</td>
+                        <td className="p-2 font-bold">{formatRupiah(p.totalPay)}</td>
+                        <td className="p-2 text-center">
+                          <button
+                            onClick={() => handleRemoveFromStaged(p.employeeId)}
+                            className="p-1 text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                          >
+                            <TrashIcon />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Jabatan</label>
-            <input
-              type="text"
-              value={position}
-              onChange={(e) => setPosition(e.target.value)}
-              className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary"
-              required
-            />
-          </div>
+              <div className="border-t border-slate-200 pt-3 mt-3 flex justify-between items-center">
+                <span className="font-semibold text-slate-700">Total</span>
+                <span className="font-bold text-lg text-slate-800">{formatRupiah(totalStagedPayroll)}</span>
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Gaji per Hari</label>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={formatRupiahInput(daily_rate)}
-              onChange={(e) => setDailyRate(parseRupiahInput(e.target.value))}
-              placeholder="cth: Rp 500.000"
-              className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Tunjangan Mingguan</label>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={formatRupiahInput(weekly_allowance)}
-              onChange={(e) => setWeeklyAllowance(parseRupiahInput(e.target.value))}
-              placeholder="cth: Rp 300.000"
-              className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary"
-              required
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-slate-200 text-slate-800 rounded-md hover:bg-slate-300 font-semibold"
-            >
-              Batal
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-indigo-700 font-semibold"
-            >
-              {employeeToEdit ? 'Simpan Perubahan' : 'Tambah'}
-            </button>
-          </div>
-        </form>
-      </div>
+              <button
+                onClick={handleSubmit}
+                className="w-full bg-brand-secondary hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg transition-colors text-lg"
+              >
+                Proses Gaji ({stagedPayments.length} Karyawan)
+              </button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };
 
-export default EmployeeFormModal;
+export default PayrollCalculator;
