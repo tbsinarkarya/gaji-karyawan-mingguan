@@ -156,60 +156,78 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
                   </div>
                 </div>
 
-                {/* Input */}
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs text-slate-500 font-medium ml-1 mb-1 block">Hari Kerja</label>
-                    <input
-                      type="number"
-                      placeholder="Jumlah hari"
-                      value={currentInputs.daysWorked}
-                      onChange={e => handleInputChange('daysWorked', e.target.value)}
-                      className="w-full pl-4 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent transition"
-                      min={1}
-                      max={7}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-xs text-slate-500 font-medium ml-1 mb-1 block">Tunjangan (Auto saat 6 hari)</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="cth: Rp 300.000"
-                        value={currentInputs.totalAllowance ? `Rp ${parseRupiah(currentInputs.totalAllowance).toLocaleString('id-ID')}` : ''}
-                        onChange={e => handleInputChange('totalAllowance', e.target.value)}
-                        disabled={isAllowanceDisabled}
-                        className="w-full pl-4 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent transition disabled:bg-slate-100 disabled:cursor-not-allowed"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs text-slate-500 font-medium ml-1 mb-1 block">Tunjangan Lain (THR/Bonus)</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="cth: Rp 500.000"
-                        value={currentInputs.extraAllowance ? `Rp ${parseRupiah(currentInputs.extraAllowance).toLocaleString('id-ID')}` : ''}
-                        onChange={e => handleInputChange('extraAllowance', e.target.value)}
-                        className="w-full pl-4 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent transition"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs text-slate-500 font-medium ml-1 mb-1 block">Potongan Pinjaman</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="cth: Rp 100.000"
-                        value={currentInputs.loanDeduction ? `Rp ${parseRupiah(currentInputs.loanDeduction).toLocaleString('id-ID')}` : 'Rp 0'}
-                        onChange={e => handleInputChange('loanDeduction', e.target.value)}
-                        className="w-full pl-4 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent transition"
-                      />
-                    </div>
-                  </div>
+                {/* Hari Kerja */}
+                <div>
+                  <label className="text-xs text-slate-600 font-medium ml-1 mb-1 block">Hari Kerja</label>
+                  <input
+                    type="number"
+                    placeholder="Jumlah hari"
+                    value={currentInputs.daysWorked}
+                    onChange={e => handleInputChange('daysWorked', e.target.value)}
+                    className="w-full pl-4 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent transition"
+                    min={1}
+                    max={7}
+                  />
                 </div>
+
+                {/* Tabel compact untuk Tunjangan / Tunjangan Lain / Potongan */}
+                <div className="overflow-hidden rounded-lg border border-slate-200">
+                  <table className="w-full table-fixed text-sm">
+                    <colgroup>
+                      <col className="w-1/2" />
+                      <col className="w-1/2" />
+                    </colgroup>
+                    <tbody className="[&_td]:px-3 [&_td]:py-2 [&_td]:align-middle">
+                      <tr className="bg-slate-50">
+                        <td className="text-slate-600">
+                          Tunjangan <span className="text-[11px] text-slate-500">(auto 6 hari)</span>
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="Rp 300.000"
+                            value={currentInputs.totalAllowance ? `Rp ${parseRupiah(currentInputs.totalAllowance).toLocaleString('id-ID')}` : ''}
+                            onChange={e => handleInputChange('totalAllowance', e.target.value)}
+                            disabled={isAllowanceDisabled}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-transparent disabled:bg-slate-100 disabled:text-slate-400"
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="text-slate-600">Tunjangan Lain <span className="text-[11px] text-slate-500">(THR/Bonus)</span></td>
+                        <td>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="Rp 500.000"
+                            value={currentInputs.extraAllowance ? `Rp ${parseRupiah(currentInputs.extraAllowance).toLocaleString('id-ID')}` : ''}
+                            onChange={e => handleInputChange('extraAllowance', e.target.value)}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                          />
+                        </td>
+                      </tr>
+                      <tr className="bg-slate-50">
+                        <td className="text-slate-600">Potongan Pinjaman</td>
+                        <td>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="Rp 100.000"
+                            value={currentInputs.loanDeduction ? `Rp ${parseRupiah(currentInputs.loanDeduction).toLocaleString('id-ID')}` : 'Rp 0'}
+                            onChange={e => handleInputChange('loanDeduction', e.target.value)}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                          />
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Hint ringkas */}
+                <p className="text-[11px] text-slate-500">
+                  Masukkan angka Rupiah. Contoh: <span className="font-medium text-slate-600">Rp 80.000</span>
+                </p>
 
                 <button
                   onClick={handleAddToStaged}
