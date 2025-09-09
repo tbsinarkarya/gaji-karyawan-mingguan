@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 
 import { Pool } from "pg";
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -18,6 +19,11 @@ const pool = new Pool({
  * Pakai destructuring dengan `any` agar tidak ditolak oleh validator route.
  */
 export async function DELETE(req: Request, { params }: any) {
+  const user = await getCurrentUser();
+  if (!user) return new NextResponse("Unauthorized", { status: 401 });
+  if ((user.role || "").toLowerCase() !== "admin") {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
   try {
     const id: string | undefined = params?.id;
     if (!id) {

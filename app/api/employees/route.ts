@@ -3,6 +3,7 @@ export const runtime = "nodejs"; // wajib untuk driver pg di Vercel/Next.js
 
 import { Pool } from "pg";
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -29,6 +30,8 @@ function toNonNegativeNumber(v: any, def = 0): number {
 
 // ✅ GET semua karyawan (no-store supaya selalu segar)
 export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) return new NextResponse("Unauthorized", { status: 401 });
   try {
     const result = await pool.query(
       "SELECT id, name, position, daily_rate, weekly_allowance, image_url FROM employees ORDER BY id DESC"
@@ -42,6 +45,11 @@ export async function GET() {
 
 // ✅ POST tambah karyawan baru
 export async function POST(req: Request) {
+  const user = await getCurrentUser();
+  if (!user) return new NextResponse("Unauthorized", { status: 401 });
+  if ((user.role || "").toLowerCase() !== "admin") {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
   try {
     const body = await req.json();
     let { name, position, daily_rate, weekly_allowance, image_url } = body || {};
@@ -76,6 +84,11 @@ export async function POST(req: Request) {
 
 // ✅ PUT update data karyawan (full update)
 export async function PUT(req: Request) {
+  const user = await getCurrentUser();
+  if (!user) return new NextResponse("Unauthorized", { status: 401 });
+  if ((user.role || "").toLowerCase() !== "admin") {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
   try {
     const body = await req.json();
     let { id, name, position, daily_rate, weekly_allowance, image_url } = body || {};
@@ -123,6 +136,11 @@ export async function PUT(req: Request) {
 
 // ✅ DELETE hapus karyawan
 export async function DELETE(req: Request) {
+  const user = await getCurrentUser();
+  if (!user) return new NextResponse("Unauthorized", { status: 401 });
+  if ((user.role || "").toLowerCase() !== "admin") {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
   try {
     const body = await req.json().catch(() => ({}));
     const employeeId = Number(body?.id);

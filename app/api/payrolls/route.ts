@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 
 import { Pool } from "pg";
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -95,6 +96,8 @@ async function buildWeeklyPayroll(weekStart: string, weekEnd: string) {
 
 // GET: kelompokkan per minggu
 export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) return new NextResponse("Unauthorized", { status: 401 });
   try {
     const weeksRes = await pool.query<{ week_start: string; week_end: string }>(
       `SELECT week_start, week_end
@@ -123,6 +126,14 @@ export async function GET() {
 
 // POST: simpan per-employee untuk periode
 export async function POST(req: Request) {
+  const user = await getCurrentUser();
+  if (!user) return new NextResponse("Unauthorized", { status: 401 });
+  {
+    const role = (user.role || "").toLowerCase();
+    if (role !== "admin" && role !== "staff") {
+      return new NextResponse("Forbidden", { status: 403 });
+    }
+  }
   try {
     const body = await req.json();
     const { employeePayments, weekStartDate, weekEndDate } = body;

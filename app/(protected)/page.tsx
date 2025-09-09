@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState, useCallback } from "react";
 import type { Employee, WeeklyPayroll } from "@/types";
@@ -237,8 +237,20 @@ export default function Page() {
     <ErrorBoundary>
       <div className="min-h-screen bg-slate-100 font-sans">
         <div className="max-w-md mx-auto bg-white shadow-lg min-h-screen pb-20">
-          <header className="bg-indigo-600 text-white p-4 shadow-md">
-            <h1 className="text-2xl font-bold text-center">Payroll App</h1>
+          <header className="bg-indigo-600 text-white p-4 shadow-md flex items-center justify-between">
+            <h1 className="text-2xl font-bold">Payroll App</h1>
+            <button
+              onClick={async () => {
+                try {
+                  await fetch('/api/auth/logout', { method: 'POST' });
+                } finally {
+                  window.location.href = '/login';
+                }
+              }}
+              className="text-sm bg-white/10 hover:bg-white/20 px-3 py-1 rounded"
+            >
+              Keluar
+            </button>
           </header>
           <main className="p-4">{renderView()}</main>
           <BottomNav currentView={currentView} setCurrentView={setCurrentView} />
