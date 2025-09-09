@@ -55,6 +55,7 @@ class ErrorBoundary extends React.Component<
 export default function Page() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [payrolls, setPayrolls] = useState<WeeklyPayroll[]>([]);
+  const [currentUser, setCurrentUser] = useState<{ username: string; role: string } | null>(null);
   const [currentView, setCurrentView] = useState<View>("dashboard");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -66,6 +67,15 @@ export default function Page() {
 
   // --- Load data API ---
   useEffect(() => {
+    const loadMe = async () => {
+      try {
+        const res = await fetch("/api/auth/me", { cache: "no-store" });
+        if (res.ok) {
+          const me = await res.json();
+          setCurrentUser({ username: me.username, role: me.role });
+        }
+      } catch {}
+    };
     const loadEmployees = async () => {
       try {
         const res = await fetch("/api/employees");
@@ -90,6 +100,7 @@ export default function Page() {
       }
     };
 
+    loadMe();
     loadEmployees();
     loadPayrolls();
   }, []);
@@ -237,9 +248,15 @@ export default function Page() {
     <ErrorBoundary>
       <div className="min-h-screen bg-slate-100 font-sans">
         <div className="max-w-md mx-auto bg-white shadow-lg min-h-screen pb-20">
-          <header className="bg-indigo-600 text-white p-4 shadow-md flex items-center justify-between">
+          <header className="bg-indigo-600 text-white p-4 shadow-md flex items-center justify-between gap-2">
             <h1 className="text-2xl font-bold">Payroll App</h1>
-            <button
+            <div className="flex items-center gap-3 text-sm">
+              {currentUser && (
+                <span className="px-2 py-1 bg-white/10 rounded">
+                  {currentUser.username} ({currentUser.role})
+                </span>
+              )}
+              <button
               onClick={async () => {
                 try {
                   await fetch('/api/auth/logout', { method: 'POST' });
@@ -251,6 +268,7 @@ export default function Page() {
             >
               Keluar
             </button>
+            </div>
           </header>
           <main className="p-4">{renderView()}</main>
           <BottomNav currentView={currentView} setCurrentView={setCurrentView} />
