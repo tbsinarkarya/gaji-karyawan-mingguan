@@ -203,8 +203,9 @@ const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
   if (loanDeduction > 0) message += `*Potongan:* -${formatCurrency(loanDeduction)}\n`;
   message += `*Total Diterima:* *${formatCurrency(p.totalPay)}*\n`;
 
-    // Sanitize possible mojibake header from encoding issues (keep emoji)
-    message = message.replace(/^.*?\*Slip Gaji Mingguan\*\\n\\n/, '🧾 *Slip Gaji Mingguan*\\n\\n');
+    // Force a clean header and drop any mojibake prefix
+    const _header = '🧾 *Slip Gaji Mingguan*\\n\\n';
+    message = _header + message.replace(/^.*?\\n\\n/, '');
     return message;
   };
 
@@ -228,8 +229,9 @@ const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
     message += `*Total Diterima:* *${formatCurrency(p.totalPay)}*\n-----------------------------------\n`;
   });
 
-    // Sanitize possible mojibake header from encoding issues (keep emoji)
-    message = message.replace(/^.*?\*Slip Gaji Mingguan\*\\n\\n/, '🧾 *Slip Gaji Mingguan*\\n\\n');
+    // Force a clean header and drop any mojibake prefix
+    const _header = '🧾 *Slip Gaji Mingguan*\\n\\n';
+    message = _header + message.replace(/^.*?\\n\\n/, '');
     return message;
   };
 
