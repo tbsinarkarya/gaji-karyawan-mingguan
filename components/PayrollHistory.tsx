@@ -203,6 +203,8 @@ const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
   if (loanDeduction > 0) message += `*Potongan:* -${formatCurrency(loanDeduction)}\n`;
   message += `*Total Diterima:* *${formatCurrency(p.totalPay)}*\n`;
 
+    // Sanitize possible mojibake header from encoding issues
+    message = message.replace(/^.*?\*Slip Gaji Mingguan\*\\n\\n/, '*Slip Gaji Mingguan*\\n\\n');
     return message;
   };
 
@@ -226,6 +228,8 @@ const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
     message += `*Total Diterima:* *${formatCurrency(p.totalPay)}*\n-----------------------------------\n`;
   });
 
+    // Sanitize possible mojibake header from encoding issues
+    message = message.replace(/^.*?\*Slip Gaji Mingguan\*\\n\\n/, '*Slip Gaji Mingguan*\\n\\n');
     return message;
   };
 
