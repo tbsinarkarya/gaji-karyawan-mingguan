@@ -115,8 +115,7 @@ function sanitizeWAHeader(msg: string) {
     || afterTrim.startsWith('ð')
     || afterTrim.startsWith('*Slip Gaji Mingguan*');
   if (startsDup) {
-    const nl = after.indexOf('\\n');
-    if (nl >= 0) out = header + after.slice(nl + 2);
+    out = header + after.replace(/^\*?\s*Slip Gaji Mingguan\*?\s*/i, '');
   }
   return out;
 }
@@ -214,9 +213,8 @@ const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
   const extraAllowance = Number(p.extraAllowance ?? 0);
   const loanDeduction = Number(p.loanDeduction ?? 0);
 
-  let message = `ðŸ§¾ *Slip Gaji Mingguan*\n\n`;
-  message = `*Slip Gaji Mingguan*\n\n`;
-  message += `*Periode:* ${formatDateRange(weekStart, weekEnd)}\n\n`;
+  let message = `*Slip Gaji Mingguan*\n\n`;
+message += `*Periode:* ${formatDateRange(weekStart, weekEnd)}\n\n`;
   message += `*Nama:* ${p.employeeName}\n*Jabatan:* ${p.position}\n*Hari Kerja:* ${p.daysWorked} hari\n`;
   message += `*Gaji Pokok:* ${formatCurrency(p.basePay)}\n`;
   message += `*Tunjangan:* ${formatCurrency(totalAllowance)}\n`;
@@ -232,9 +230,8 @@ const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
 
 // Share WhatsApp satu periode (semua karyawan)
   const buildWholePayrollWhatsAppMessage = (payroll: WeeklyPayroll) => {
-  let message = `ðŸ§¾ *Slip Gaji Mingguan*\n\n`;
-  message = `*Slip Gaji Mingguan*\n\n`;
-  message += `*Periode:* ${formatDateRange(payroll.weekStartDate, payroll.weekEndDate)}\n`;
+  let message = `*Slip Gaji Mingguan*\n\n`;
+message += `*Periode:* ${formatDateRange(payroll.weekStartDate, payroll.weekEndDate)}\n`;
   message += `*Total Gaji Dibayarkan:* ${formatCurrency(payroll.totalPayroll)}\n\n`;
   message += `*Rincian Karyawan:*\n-----------------------------------\n`;
 
