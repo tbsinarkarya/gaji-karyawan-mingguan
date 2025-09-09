@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
 import type { Employee } from "@/types";
 
+type NewEmployee = Omit<Employee, "id" | "created_at">;
+
 interface EmployeeFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddEmployee: (employee: Omit<Employee, "id">) => Promise<void>;
+  onAddEmployee: (employee: NewEmployee) => Promise<void>; // ⬅️ pakai NewEmployee
   onUpdateEmployee: (employee: Employee) => Promise<void>;
   employeeToEdit: Employee | null;
 }
@@ -19,6 +21,7 @@ const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   const isEdit = Boolean(employeeToEdit);
 
   const [name, setName] = useState("");
+  const [position, setPosition] = useState("");            // ⬅️ JABATAN
   const [dailyRate, setDailyRate] = useState<string>("");
   const [weeklyAllowance, setWeeklyAllowance] = useState<string>("");
   const [imageUrl, setImageUrl] = useState("");
@@ -26,12 +29,14 @@ const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   useEffect(() => {
     if (isOpen && employeeToEdit) {
       setName(employeeToEdit.name ?? "");
+      setPosition(employeeToEdit.position ?? "");          // ⬅️ isi dari data edit
       setDailyRate(String(employeeToEdit.daily_rate ?? 0));
       setWeeklyAllowance(String(employeeToEdit.weekly_allowance ?? 0));
       setImageUrl(employeeToEdit.image_url ?? "");
     } else if (isOpen) {
       // reset on open (add mode)
       setName("");
+      setPosition("");
       setDailyRate("");
       setWeeklyAllowance("");
       setImageUrl("");
@@ -50,6 +55,7 @@ const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
 
     const payloadBase = {
       name: name.trim(),
+      position: position.trim(),                            // ⬅️ include position
       daily_rate: parseIntSafe(dailyRate),
       weekly_allowance: parseIntSafe(weeklyAllowance),
       image_url: imageUrl.trim(),
@@ -57,6 +63,10 @@ const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
 
     if (!payloadBase.name) {
       alert("Nama tidak boleh kosong.");
+      return;
+    }
+    if (!payloadBase.position) {
+      alert("Jabatan tidak boleh kosong.");
       return;
     }
     if (payloadBase.daily_rate <= 0) {
@@ -68,8 +78,8 @@ const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       if (isEdit && employeeToEdit) {
         await onUpdateEmployee({ ...employeeToEdit, ...payloadBase });
       } else {
-        const { name, daily_rate, weekly_allowance, image_url } = payloadBase;
-        await onAddEmployee({ name, daily_rate, weekly_allowance, image_url });
+        // created_at akan diisi backend
+        await onAddEmployee(payloadBase);
       }
       onClose();
     } catch (err) {
@@ -109,6 +119,18 @@ const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
               onChange={(e) => setName(e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               placeholder="Nama karyawan"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-slate-600 mb-1">Jabatan</label>
+            <input
+              type="text"
+              value={position}
+              onChange={(e) => setPosition(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="cth: Operator, Admin, Driver"
               required
             />
           </div>
