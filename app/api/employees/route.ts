@@ -1,8 +1,8 @@
 // app/api/employees/route.ts
+export const runtime = "nodejs"; // wajib untuk driver pg di Vercel/Next.js
+
 import { Pool } from "pg";
 import { NextResponse } from "next/server";
-
-export const runtime = "node"; // pg membutuhkan Node runtime
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -131,7 +131,7 @@ export async function DELETE(req: Request) {
       return new NextResponse("Employee ID is required", { status: 400 });
     }
 
-    // Catatan: jika ada FK (mis. payroll.employee_id), pastikan ON DELETE RESTRICT/CASCADE sesuai kebutuhan
+    // Catatan: jika ada FK (mis. payroll.employee_id), sesuaikan ON DELETE di DB
     const result = await pool.query(
       `DELETE FROM employees WHERE id = $1
        RETURNING id, name, position, daily_rate, weekly_allowance, image_url`,

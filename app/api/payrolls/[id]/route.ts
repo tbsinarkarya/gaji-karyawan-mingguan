@@ -1,50 +1,50 @@
-// app/api/payrolls/[id]/route.ts
-import { NextResponse } from "next/server";
+export const runtime = "nodejs"; // pastikan pakai Node.js runtime
+
 import { Pool } from "pg";
+import { NextResponse } from "next/server";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 
-export async function DELETE(req: Request) {
+// 🔹 DELETE payroll by id (numeric) atau periode (weekStart_weekEnd)
+export async function DELETE(
+  req: Request,
+  context: { params: { id: string } }
+) {
   try {
-    // Ambil id dari URL (tanpa mengandalkan context params)
-    const url = new URL(req.url);
-    const parts = url.pathname.split("/").filter(Boolean);
-    const raw = parts[parts.length - 1]; // .../api/payrolls/[id]
+    const { id } = context.params;
 
-    if (!raw) {
+    if (!id) {
       return new NextResponse("Payroll id required", { status: 400 });
     }
 
-    // Case 1: numeric id -> hapus 1 baris payroll
-    if (!Number.isNaN(Number(raw))) {
-      const del = await pool.query(
+    // jika id numeric → hapus 1 row payroll
+    if (!Number.isNaN(Number(id))) {
+      const delRes = await pool.query(
         `DELETE FROM payroll WHERE id = $1 RETURNING *`,
-        [Number(raw)]
+        [Number(id)]
       );
-      if (del.rowCount === 0) {
+      if (delRes.rows.length === 0) {
         return new NextResponse("Payroll not found", { status: 404 });
       }
-      return NextResponse.json({ success: true, deleted: del.rows[0] });
+      return NextResponse.json({ success: true, deleted: delRes.rows[0] });
     }
 
-    // Case 2: "weekStart_weekEnd" -> hapus semua payroll di periode tsb
-    if (raw.includes("_")) {
-      const [ws, we] = raw.split("_");
-      const del = await pool.query(
-        `DELETE FROM payroll
-         WHERE week_start = $1::date AND week_end = $2::date
-         RETURNING id`,
+    // jika id weekStart_weekEnd
+    if (id.includes("_")) {
+      const [ws, we] = id.split("_");
+      const delRes = await pool.query(
+        `DELETE FROM payroll WHERE week_start = $1::date AND week_end = $2::date RETURNING *`,
         [ws, we]
       );
-      return NextResponse.json({ success: true, deletedCount: del.rowCount });
+      return NextResponse.json({ success: true, deletedCount: delRes.rowCount });
     }
 
     return new NextResponse("Invalid id format", { status: 400 });
-  } catch (err) {
-    console.error("DELETE /api/payrolls/[id] error:", err);
+  } catch (error) {
+    console.error("DELETE /api/payrolls/[id] error:", error);
     return new NextResponse("Database delete error", { status: 500 });
   }
 }
