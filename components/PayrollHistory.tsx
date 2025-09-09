@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import type { WeeklyPayroll } from "@/types";
 import CalendarDaysIcon from "./icons/CalendarDaysIcon.tsx";
 import ChevronDownIcon from "./icons/ChevronDownIcon.tsx";
@@ -6,6 +6,7 @@ import CurrencyDollarIcon from "./icons/CurrencyDollarIcon.tsx";
 import PrintIcon from "./icons/PrintIcon.tsx";
 import ShareIcon from "./icons/ShareIcon.tsx";
 import TrashIcon from "./icons/TrashIcon.tsx";
+import WhatsAppChoiceModal from "./WhatsAppChoiceModal";
 
 interface PayrollHistoryProps {
   payrolls: WeeklyPayroll[];
@@ -77,6 +78,30 @@ const handlePrintPeriod = (payrollId: string | number) => {
     document.body.removeChild(iframe);
   };
 };
+
+// ====== Util pilih target WhatsApp ======
+const isAndroid = () => typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+
+function openWhatsApp(message: string, preferred?: "consumer" | "business") {
+  const encoded = encodeURIComponent(message);
+  if (isAndroid()) {
+    const pkg = preferred === "business" ? "com.whatsapp.w4b" : preferred === "consumer" ? "com.whatsapp" : undefined;
+    const intentUrl = pkg
+      ? `intent://send?text=${encoded}#Intent;scheme=whatsapp;package=${pkg};end`
+      : `whatsapp://send?text=${encoded}`;
+    const win = window.open(intentUrl, "_blank");
+    setTimeout(() => {
+      try {
+        if (win && win.closed === false) return;
+      } catch {}
+      window.open(`https://api.whatsapp.com/send?text=${encoded}`, "_blank");
+    }, 700);
+    return;
+  }
+  window.open(`https://api.whatsapp.com/send?text=${encoded}`, "_blank");
+}
+
+type WAChoice = "consumer" | "business";
 
 // ============ CETAK PER KARYAWAN (BARU) ============
 const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
@@ -163,13 +188,13 @@ const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
   w.document.close();
 };
 
-// ====== Share WhatsApp per karyawan (tetap) ======
-const shareOneEmployeeWhatsApp = (weekStart: string, weekEnd: string, p: any) => {
+// ====== Build WhatsApp messages ======
+  const buildOneEmployeeWhatsAppMessage = (weekStart: string, weekEnd: string, p: any) => {
   const totalAllowance = Number(p.totalAllowance ?? 0);
   const extraAllowance = Number(p.extraAllowance ?? 0);
   const loanDeduction = Number(p.loanDeduction ?? 0);
 
-  let message = `🧾 *Slip Gaji Mingguan*\n\n`;
+  let message = `ðŸ§¾ *Slip Gaji Mingguan*\n\n`;
   message += `*Periode:* ${formatDateRange(weekStart, weekEnd)}\n\n`;
   message += `*Nama:* ${p.employeeName}\n*Jabatan:* ${p.position}\n*Hari Kerja:* ${p.daysWorked} hari\n`;
   message += `*Gaji Pokok:* ${formatCurrency(p.basePay)}\n`;
@@ -178,12 +203,12 @@ const shareOneEmployeeWhatsApp = (weekStart: string, weekEnd: string, p: any) =>
   if (loanDeduction > 0) message += `*Potongan:* -${formatCurrency(loanDeduction)}\n`;
   message += `*Total Diterima:* *${formatCurrency(p.totalPay)}*\n`;
 
-  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`, "_blank");
-};
+    return message;
+  };
 
 // Share WhatsApp satu periode (semua karyawan)
-const shareWholePayrollWhatsApp = (payroll: WeeklyPayroll) => {
-  let message = `🧾 *Slip Gaji Mingguan*\n\n`;
+  const buildWholePayrollWhatsAppMessage = (payroll: WeeklyPayroll) => {
+  let message = `ðŸ§¾ *Slip Gaji Mingguan*\n\n`;
   message += `*Periode:* ${formatDateRange(payroll.weekStartDate, payroll.weekEndDate)}\n`;
   message += `*Total Gaji Dibayarkan:* ${formatCurrency(payroll.totalPayroll)}\n\n`;
   message += `*Rincian Karyawan:*\n-----------------------------------\n`;
@@ -201,12 +226,14 @@ const shareWholePayrollWhatsApp = (payroll: WeeklyPayroll) => {
     message += `*Total Diterima:* *${formatCurrency(p.totalPay)}*\n-----------------------------------\n`;
   });
 
-  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`, "_blank");
-};
+    return message;
+  };
 
 const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayroll }) => {
   const [list, setList] = useState<WeeklyPayroll[]>(payrolls);
   const [view, setView] = useState<"weekly" | "monthly">("weekly");
+  const [waChooserOpen, setWaChooserOpen] = useState(false);
+  const [waMessage, setWaMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setList(payrolls);
@@ -269,8 +296,34 @@ const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayro
       );
   }, [list]);
 
-  return (
+return (
     <div className="space-y-6">
+      <WhatsAppChoiceModal
+        isOpen={waChooserOpen}
+        onClose={() => {
+          setWaChooserOpen(false);
+          setWaMessage(null);
+        }}
+        onChoose={(choice: WAChoice) => {
+          if (waMessage) openWhatsApp(waMessage, choice);
+          setWaChooserOpen(false);
+          setWaMessage(null);
+        }}
+      />
+      <WhatsAppChoiceModal
+        isOpen={waChooserOpen}
+        onClose={() => {
+          setWaChooserOpen(false);
+          setWaMessage(null);
+        }}
+        onChoose={(choice: WAChoice) => {
+          if (waMessage) {
+            openWhatsApp(waMessage, choice);
+          }
+          setWaChooserOpen(false);
+          setWaMessage(null);
+        }}
+      />
       <div className="flex justify-between items-center mb-3">
         <h2 className="text-xl font-bold text-slate-700">Riwayat Gaji</h2>
       </div>
@@ -305,8 +358,16 @@ const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayro
                 payroll={wp}
                 onDeletePeriod={onDeletePayroll}
                 onDeleteOne={handleDeleteOneEmployee}
-                onShareOne={shareOneEmployeeWhatsApp}
-                onShareAll={shareWholePayrollWhatsApp}
+                onShareOne={(ws, we, p) => {
+                  const msg = buildOneEmployeeWhatsAppMessage(ws, we, p);
+                  setWaMessage(msg);
+                  setWaChooserOpen(true);
+                }}
+                onShareAll={(payroll) => {
+                  const msg = buildWholePayrollWhatsAppMessage(payroll);
+                  setWaMessage(msg);
+                  setWaChooserOpen(true);
+                }}
                 onPrintOne={printOneEmployeeSlip}
                 onPrintPeriod={handlePrintPeriod}
               />
@@ -321,8 +382,16 @@ const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayro
                 weeklyPayrolls={d.weeklyPayrolls}
                 onDeletePeriod={onDeletePayroll}
                 onDeleteOne={handleDeleteOneEmployee}
-                onShareOne={shareOneEmployeeWhatsApp}
-                onShareAll={shareWholePayrollWhatsApp}
+                onShareOne={(ws, we, p) => {
+                  const msg = buildOneEmployeeWhatsAppMessage(ws, we, p);
+                  setWaMessage(msg);
+                  setWaChooserOpen(true);
+                }}
+                onShareAll={(payroll) => {
+                  const msg = buildWholePayrollWhatsAppMessage(payroll);
+                  setWaMessage(msg);
+                  setWaChooserOpen(true);
+                }}
                 onPrintOne={printOneEmployeeSlip}
                 onPrintPeriod={handlePrintPeriod}
               />
@@ -527,3 +596,4 @@ const MonthlySummaryCard: React.FC<{
     </div>
   );
 };
+
