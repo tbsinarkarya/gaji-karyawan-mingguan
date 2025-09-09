@@ -9,8 +9,7 @@ import TrashIcon from "./icons/TrashIcon.tsx";
 
 interface PayrollHistoryProps {
   payrolls: WeeklyPayroll[];
-  // Tetap dipakai untuk hapus seluruh periode (weekly card)
-  onDeletePayroll: (id: string | number) => void;
+  onDeletePayroll: (id: string | number) => void; // hapus 1 periode (semua karyawan)
 }
 
 const formatCurrency = (amount: number) =>
@@ -31,7 +30,7 @@ const formatDateRange = (start: string, end: string) => {
   )}`;
 };
 
-const handlePrint = (payrollId: string | number) => {
+const handlePrintPeriod = (payrollId: string | number) => {
   const card = document.getElementById(`payroll-${payrollId}`);
   const content = card?.querySelector(".payroll-content-wrapper")?.cloneNode(true) as HTMLElement;
 
@@ -56,7 +55,8 @@ const handlePrint = (payrollId: string | number) => {
   doc.head.appendChild(tailwindScript);
 
   const style = doc.createElement("style");
-  style.textContent = `body{-webkit-print-color-adjust:exact;font-family:sans-serif}.print-container{padding:1rem;}`;
+  style.textContent =
+    `@page{margin:16mm}body{-webkit-print-color-adjust:exact;font-family:sans-serif}.print-container{padding:1rem;max-width:720px;margin:0 auto;}`;
   doc.head.appendChild(style);
 
   const container = doc.createElement("div");
@@ -68,8 +68,8 @@ const handlePrint = (payrollId: string | number) => {
     setTimeout(() => {
       iframe.contentWindow?.focus();
       iframe.contentWindow?.print();
-      setTimeout(() => document.body.removeChild(iframe), 1000);
-    }, 500);
+      setTimeout(() => document.body.removeChild(iframe), 800);
+    }, 350);
   };
 
   tailwindScript.onerror = () => {
@@ -78,11 +78,96 @@ const handlePrint = (payrollId: string | number) => {
   };
 };
 
-// ====== BARU: Share WhatsApp per KARYAWAN ======
+// ============ CETAK PER KARYAWAN (BARU) ============
+const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
+  const html = `
+  <html>
+    <head>
+      <title>Slip Gaji - ${p.employeeName}</title>
+      <script src="https://cdn.tailwindcss.com"></script>
+      <style>
+        @page { margin: 16mm }
+        body { -webkit-print-color-adjust: exact; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial }
+      </style>
+    </head>
+    <body class="bg-white">
+      <div class="max-w-md mx-auto p-6">
+        <div class="border rounded-xl p-5 shadow">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h1 class="text-lg font-bold text-slate-800">Slip Gaji Mingguan</h1>
+              <p class="text-sm text-slate-500">${formatDateRange(weekStart, weekEnd)}</p>
+            </div>
+            <div class="text-right">
+              <p class="text-xs text-slate-500">Tanggal Cetak</p>
+              <p class="text-sm font-medium">${new Date().toLocaleString("id-ID")}</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3 mb-4">
+            ${p.image_url ? `<img src="${p.image_url}" class="w-12 h-12 rounded-full object-cover" />` : ""}
+            <div>
+              <p class="font-semibold text-slate-800">${p.employeeName}</p>
+              <p class="text-xs text-slate-500">${p.position ?? "-"}</p>
+            </div>
+          </div>
+
+          <div class="text-sm divide-y divide-slate-200">
+            <div class="flex justify-between py-2">
+              <span class="text-slate-600">Hari Kerja</span>
+              <span class="font-medium">${p.daysWorked} hari</span>
+            </div>
+            <div class="flex justify-between py-2">
+              <span class="text-slate-600">Gaji Pokok</span>
+              <span class="font-medium">${formatCurrency(p.basePay)}</span>
+            </div>
+            <div class="flex justify-between py-2">
+              <span class="text-slate-600">Tunjangan</span>
+              <span class="font-medium">${formatCurrency(Number(p.totalAllowance ?? 0))}</span>
+            </div>
+            ${
+              Number(p.extraAllowance ?? 0) > 0
+                ? `<div class="flex justify-between py-2">
+                     <span class="text-slate-600">Tunjangan Lain (THR/Bonus)</span>
+                     <span class="font-medium">${formatCurrency(Number(p.extraAllowance ?? 0))}</span>
+                   </div>`
+                : ""
+            }
+            ${
+              Number(p.loanDeduction ?? 0) > 0
+                ? `<div class="flex justify-between py-2 text-red-600">
+                     <span>Potongan Pinjaman</span>
+                     <span>-${formatCurrency(Number(p.loanDeduction ?? 0))}</span>
+                   </div>`
+                : ""
+            }
+            <div class="flex justify-between py-2 text-base">
+              <span class="font-semibold text-slate-700">Total Diterima</span>
+              <span class="font-bold text-slate-900">${formatCurrency(p.totalPay)}</span>
+            </div>
+          </div>
+
+          <p class="mt-6 text-[10px] text-slate-400">Dokumen ini dicetak otomatis dari sistem. Tidak memerlukan tanda tangan.</p>
+        </div>
+      </div>
+      <script>
+        window.addEventListener('load', () => { window.print(); setTimeout(() => window.close(), 300); });
+      </script>
+    </body>
+  </html>`.trim();
+
+  const w = window.open("", "_blank", "noopener,noreferrer,width=480,height=720");
+  if (!w) return;
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+};
+
+// ====== Share WhatsApp per karyawan (tetap) ======
 const shareOneEmployeeWhatsApp = (weekStart: string, weekEnd: string, p: any) => {
-  const totalAllowance = Number(p.totalAllowance ?? 0); // input (auto/manual)
-  const extraAllowance = Number(p.extraAllowance ?? 0); // kolom baru
-  const loanDeduction = Number(p.loanDeduction ?? 0); // kolom baru
+  const totalAllowance = Number(p.totalAllowance ?? 0);
+  const extraAllowance = Number(p.extraAllowance ?? 0);
+  const loanDeduction = Number(p.loanDeduction ?? 0);
 
   let message = `🧾 *Slip Gaji Mingguan*\n\n`;
   message += `*Periode:* ${formatDateRange(weekStart, weekEnd)}\n\n`;
@@ -96,7 +181,7 @@ const shareOneEmployeeWhatsApp = (weekStart: string, weekEnd: string, p: any) =>
   window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`, "_blank");
 };
 
-// Tetap ada: share untuk satu periode (semua karyawan)
+// Share WhatsApp satu periode (semua karyawan)
 const shareWholePayrollWhatsApp = (payroll: WeeklyPayroll) => {
   let message = `🧾 *Slip Gaji Mingguan*\n\n`;
   message += `*Periode:* ${formatDateRange(payroll.weekStartDate, payroll.weekEndDate)}\n`;
@@ -120,7 +205,6 @@ const shareWholePayrollWhatsApp = (payroll: WeeklyPayroll) => {
 };
 
 const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayroll }) => {
-  // ====== BARU: salin props ke state lokal agar kita bisa optimistically update saat hapus 1 karyawan
   const [list, setList] = useState<WeeklyPayroll[]>(payrolls);
   const [view, setView] = useState<"weekly" | "monthly">("weekly");
 
@@ -128,7 +212,7 @@ const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayro
     setList(payrolls);
   }, [payrolls]);
 
-  // ====== BARU: hapus 1 karyawan (1 row di tabel payroll) via /api/payrolls/:id
+  // Hapus 1 karyawan (1 baris payroll) di periode
   const handleDeleteOneEmployee = async (
     weekId: string | number,
     weekStart: string,
@@ -146,7 +230,7 @@ const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayro
       const res = await fetch(`/api/payrolls/${payrollRowId}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Gagal menghapus baris payroll.");
 
-      // Optimistic update state lokal:
+      // Optimistic update
       setList((prev) =>
         prev
           .map((wp) => {
@@ -155,7 +239,7 @@ const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayro
             const newTotal = left.reduce((s, p: any) => s + (p.totalPay || 0), 0);
             return { ...wp, employeePayments: left, totalPayroll: newTotal };
           })
-          .filter((wp) => (wp.employeePayments || []).length > 0) // kalau kosong, sembunyikan card minggu ini
+          .filter((wp) => (wp.employeePayments || []).length > 0)
       );
     } catch (e) {
       console.error(e);
@@ -223,6 +307,8 @@ const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayro
                 onDeleteOne={handleDeleteOneEmployee}
                 onShareOne={shareOneEmployeeWhatsApp}
                 onShareAll={shareWholePayrollWhatsApp}
+                onPrintOne={printOneEmployeeSlip}
+                onPrintPeriod={handlePrintPeriod}
               />
             ))}
 
@@ -237,6 +323,8 @@ const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayro
                 onDeleteOne={handleDeleteOneEmployee}
                 onShareOne={shareOneEmployeeWhatsApp}
                 onShareAll={shareWholePayrollWhatsApp}
+                onPrintOne={printOneEmployeeSlip}
+                onPrintPeriod={handlePrintPeriod}
               />
             ))}
         </div>
@@ -258,7 +346,8 @@ const PayrollCardContent: React.FC<{
   payroll: WeeklyPayroll;
   onDeleteOne: (weekId: string | number, ws: string, we: string, payrollRowId?: number) => void;
   onShareOne: (ws: string, we: string, p: any) => void;
-}> = ({ payroll, onDeleteOne, onShareOne }) => (
+  onPrintOne: (ws: string, we: string, p: any) => void;
+}> = ({ payroll, onDeleteOne, onShareOne, onPrintOne }) => (
   <div className="payroll-content-wrapper">
     <div className="flex justify-between items-start mb-3">
       <div>
@@ -311,13 +400,22 @@ const PayrollCardContent: React.FC<{
             <div className="flex flex-col items-end gap-1 ml-3">
               <p className="font-bold text-slate-800">{formatCurrency(payment.totalPay)}</p>
               <div className="flex gap-1">
-                {/* Share per karyawan */}
+                {/* Bagikan per karyawan */}
                 <button
                   title="Bagikan via WhatsApp"
                   onClick={() => onShareOne(payroll.weekStartDate, payroll.weekEndDate, payment)}
                   className="p-2 text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors"
                 >
                   <ShareIcon className="w-4 h-4" />
+                </button>
+
+                {/* Cetak per karyawan (BARU) */}
+                <button
+                  title="Cetak slip karyawan ini"
+                  onClick={() => onPrintOne(payroll.weekStartDate, payroll.weekEndDate, payment)}
+                  className="p-2 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                >
+                  <PrintIcon className="w-4 h-4" />
                 </button>
 
                 {/* Hapus per karyawan */}
@@ -345,7 +443,8 @@ const PayrollCardActions: React.FC<{
   payroll: WeeklyPayroll;
   onDeletePeriod: (id: string | number) => void;
   onShareAll: (payroll: WeeklyPayroll) => void;
-}> = ({ payroll, onDeletePeriod, onShareAll }) => (
+  onPrintPeriod: (payrollId: string | number) => void;
+}> = ({ payroll, onDeletePeriod, onShareAll, onPrintPeriod }) => (
   <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-end space-x-2 no-print">
     <button
       onClick={() => onDeletePeriod(payroll.id)}
@@ -362,11 +461,11 @@ const PayrollCardActions: React.FC<{
       <span>Bagikan Semua</span>
     </button>
     <button
-      onClick={() => handlePrint(payroll.id)}
+      onClick={() => onPrintPeriod(payroll.id)}
       className="flex items-center space-x-2 text-sm text-slate-600 hover:text-brand-primary font-semibold py-2 px-3 rounded-lg hover:bg-indigo-50 transition-colors"
     >
       <PrintIcon className="w-4 h-4" />
-      <span>Cetak</span>
+      <span>Cetak Periode</span>
     </button>
   </div>
 );
@@ -377,10 +476,12 @@ const WeeklyPayrollCard: React.FC<{
   onDeleteOne: (weekId: string | number, ws: string, we: string, payrollRowId?: number) => void;
   onShareOne: (ws: string, we: string, p: any) => void;
   onShareAll: (payroll: WeeklyPayroll) => void;
-}> = ({ payroll, onDeletePeriod, onDeleteOne, onShareOne, onShareAll }) => (
+  onPrintOne: (ws: string, we: string, p: any) => void;
+  onPrintPeriod: (payrollId: string | number) => void;
+}> = ({ payroll, onDeletePeriod, onDeleteOne, onShareOne, onShareAll, onPrintOne, onPrintPeriod }) => (
   <div id={`payroll-${payroll.id}`} className="bg-white p-4 rounded-lg shadow-sm">
-    <PayrollCardContent payroll={payroll} onDeleteOne={onDeleteOne} onShareOne={onShareOne} />
-    <PayrollCardActions payroll={payroll} onDeletePeriod={onDeletePeriod} onShareAll={onShareAll} />
+    <PayrollCardContent payroll={payroll} onDeleteOne={onDeleteOne} onShareOne={onShareOne} onPrintOne={onPrintOne} />
+    <PayrollCardActions payroll={payroll} onDeletePeriod={onDeletePeriod} onShareAll={onShareAll} onPrintPeriod={onPrintPeriod} />
   </div>
 );
 
@@ -392,7 +493,9 @@ const MonthlySummaryCard: React.FC<{
   onDeleteOne: (weekId: string | number, ws: string, we: string, payrollRowId?: number) => void;
   onShareOne: (ws: string, we: string, p: any) => void;
   onShareAll: (payroll: WeeklyPayroll) => void;
-}> = ({ monthYear, totalPayroll, weeklyPayrolls, onDeletePeriod, onDeleteOne, onShareOne, onShareAll }) => {
+  onPrintOne: (ws: string, we: string, p: any) => void;
+  onPrintPeriod: (payrollId: string | number) => void;
+}> = ({ monthYear, totalPayroll, weeklyPayrolls, onDeletePeriod, onDeleteOne, onShareOne, onShareAll, onPrintOne, onPrintPeriod }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
@@ -415,8 +518,8 @@ const MonthlySummaryCard: React.FC<{
         <div className="p-4 pt-0 space-y-4">
           {weeklyPayrolls.map((payroll) => (
             <div key={payroll.id} className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-              <PayrollCardContent payroll={payroll} onDeleteOne={onDeleteOne} onShareOne={onShareOne} />
-              <PayrollCardActions payroll={payroll} onDeletePeriod={onDeletePeriod} onShareAll={onShareAll} />
+              <PayrollCardContent payroll={payroll} onDeleteOne={onDeleteOne} onShareOne={onShareOne} onPrintOne={onPrintOne} />
+              <PayrollCardActions payroll={payroll} onDeletePeriod={onDeletePeriod} onShareAll={onShareAll} onPrintPeriod={onPrintPeriod} />
             </div>
           ))}
         </div>
