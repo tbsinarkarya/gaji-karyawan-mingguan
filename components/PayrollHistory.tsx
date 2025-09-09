@@ -79,141 +79,123 @@ const handlePrint = (payrollId: string | number) => {
 
 const handleShareWhatsApp = (payroll: WeeklyPayroll) => {
   let message = `🧾 *Slip Gaji Mingguan*\n\n`;
-  message += `*Periode:* ${formatDateRange(payroll.weekStartDate as any, payroll.weekEndDate as any)}\n`;
-  message += `*Total Gaji Dibayarkan:* ${formatCurrency(payroll.totalPayroll as any)}\n\n`;
+  message += `*Periode:* ${formatDateRange(payroll.weekStartDate, payroll.weekEndDate)}\n`;
+  message += `*Total Gaji Dibayarkan:* ${formatCurrency(payroll.totalPayroll)}\n\n`;
   message += `*Rincian Karyawan:*\n-----------------------------------\n`;
 
-  (payroll.employeePayments ?? []).forEach((p: any) => {
-    message += `*Nama:* ${p.employeeName ?? '-'}\n*Jabatan:* ${p.position ?? '-'}\n*Hari Kerja:* ${
-      p.daysWorked ?? 0
-    } hari\n*Gaji Pokok:* ${formatCurrency(p.basePay ?? 0)}\n*Tunjangan:* ${formatCurrency(
-      p.totalAllowance ?? 0
-    )}\n`;
-    if (p.extraAllowance && p.extraAllowance > 0) {
-      message += `*Tunjangan Lain:* ${formatCurrency(p.extraAllowance)}\n`;
-    }
-    if ((p.loanDeduction ?? 0) > 0) {
-      message += `*Potongan:* -${formatCurrency(p.loanDeduction)}\n`;
-    }
-    message += `*Total Diterima:* *${formatCurrency(p.totalPay ?? 0)}*\n-----------------------------------\n`;
+  (payroll.employeePayments ?? []).forEach((p) => {
+    const totalAllowance = Number(p.totalAllowance ?? 0);            // input (auto/manual)
+    const extraAllowance = Number((p as any).extraAllowance ?? 0);   // kolom baru
+    const loanDeduction  = Number((p as any).loanDeduction  ?? 0);   // kolom baru
+
+    message += `*Nama:* ${p.employeeName}\n*Jabatan:* ${p.position}\n*Hari Kerja:* ${p.daysWorked} hari\n`;
+    message += `*Gaji Pokok:* ${formatCurrency(p.basePay)}\n`;
+    message += `*Tunjangan:* ${formatCurrency(totalAllowance)}\n`;
+    if (extraAllowance > 0) message += `*Tunjangan Lain:* ${formatCurrency(extraAllowance)}\n`;
+    if (loanDeduction > 0) message += `*Potongan:* -${formatCurrency(loanDeduction)}\n`;
+    message += `*Total Diterima:* *${formatCurrency(p.totalPay)}*\n-----------------------------------\n`;
   });
 
   window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`, '_blank');
 };
 
-const PayrollCardContent: React.FC<{ payroll: WeeklyPayroll }> = ({ payroll }) => {
-  const pid = String((payroll as any).id ?? ''); // normalisasi id
-
-  return (
-    <div className="payroll-content-wrapper" id={`payroll-${pid}`}>
-      <div className="flex justify-between items-start mb-3">
-        <div>
-          <div className="flex items-center space-x-2 text-sm text-slate-500">
-            <CalendarDaysIcon className="w-4 h-4" />
-            <span>{formatDateRange((payroll as any).weekStartDate, (payroll as any).weekEndDate)}</span>
-          </div>
-          <div className="flex items-center space-x-2 font-bold text-lg text-brand-secondary mt-1">
-            <CurrencyDollarIcon className="w-5 h-5" />
-            <span>{formatCurrency((payroll as any).totalPayroll ?? 0)}</span>
-          </div>
+const PayrollCardContent: React.FC<{ payroll: WeeklyPayroll }> = ({ payroll }) => (
+  <div className="payroll-content-wrapper">
+    <div className="flex justify-between items-start mb-3">
+      <div>
+        <div className="flex items-center space-x-2 text-sm text-slate-500">
+          <CalendarDaysIcon className="w-4 h-4" />
+          <span>{formatDateRange(payroll.weekStartDate, payroll.weekEndDate)}</span>
         </div>
-        <span className="text-xs bg-emerald-100 text-emerald-800 font-medium px-2 py-1 rounded-full">
-          {(payroll.employeePayments ?? []).length} Karyawan
-        </span>
+        <div className="flex items-center space-x-2 font-bold text-lg text-brand-secondary mt-1">
+          <CurrencyDollarIcon className="w-5 h-5" />
+          <span>{formatCurrency(payroll.totalPayroll)}</span>
+        </div>
       </div>
-
-      {Array.isArray(payroll.employeePayments) && payroll.employeePayments.length > 0 ? (
-        <div className="border-t border-slate-200 pt-2 mt-2 space-y-2">
-          {payroll.employeePayments.map((payment: any) => (
-            <div
-              key={payment.employeeId}
-              className="flex justify-between items-start text-sm py-2 border-b border-slate-100 last:border-b-0"
-            >
-              <div className="flex-1">
-                <p className="font-semibold text-slate-700">{payment.employeeName ?? '-'}</p>
-                <p className="text-xs text-slate-500">{payment.position ?? '-'}</p>
-                <p className="text-slate-500 text-xs mb-1">{payment.daysWorked ?? 0} hari kerja</p>
-
-                <div className="text-xs text-slate-600 mt-1 pl-2 border-l-2 border-slate-200 space-y-0.5">
-                  <div className="flex justify-between">
-                    <span>Gaji Pokok:</span> <span>{formatCurrency(payment.basePay ?? 0)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Tunjangan:</span> <span>{formatCurrency(payment.totalAllowance ?? 0)}</span>
-                  </div>
-                  {payment.extraAllowance && payment.extraAllowance > 0 && (
-                    <div className="flex justify-between">
-                      <span>Tunjangan Lain:</span> <span>{formatCurrency(payment.extraAllowance)}</span>
-                    </div>
-                  )}
-                  {payment.loanDeduction && payment.loanDeduction > 0 && (
-                    <div className="flex justify-between text-red-600">
-                      <span>Potongan:</span> <span>-{formatCurrency(payment.loanDeduction)}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <p className="font-bold text-slate-800 ml-4">{formatCurrency(payment.totalPay ?? 0)}</p>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-slate-400 text-sm italic mt-3">Tidak ada data karyawan.</p>
-      )}
+      <span className="text-xs bg-emerald-100 text-emerald-800 font-medium px-2 py-1 rounded-full">
+        {(payroll.employeePayments ?? []).length} Karyawan
+      </span>
     </div>
-  );
-};
+
+    {Array.isArray(payroll.employeePayments) && payroll.employeePayments.length > 0 ? (
+      <div className="border-t border-slate-200 pt-2 mt-2 space-y-2">
+        {payroll.employeePayments.map((payment) => (
+          <div
+            key={payment.employeeId}
+            className="flex justify-between items-start text-sm py-2 border-b border-slate-100 last:border-b-0"
+          >
+            <div className="flex-1">
+              <p className="font-semibold text-slate-700">{payment.employeeName}</p>
+              <p className="text-xs text-slate-500">{payment.position}</p>
+              <p className="text-slate-500 text-xs mb-1">{payment.daysWorked} hari kerja</p>
+
+              <div className="text-xs text-slate-600 mt-1 pl-2 border-l-2 border-slate-200 space-y-0.5">
+                <div className="flex justify-between">
+                  <span>Gaji Pokok:</span> <span>{formatCurrency(payment.basePay)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Tunjangan:</span> <span>{formatCurrency(Number(payment.totalAllowance ?? 0))}</span>
+                </div>
+                {(payment as any).extraAllowance ? (
+                  <div className="flex justify-between">
+                    <span>Tunjangan Lain:</span> <span>{formatCurrency(Number((payment as any).extraAllowance ?? 0))}</span>
+                  </div>
+                ) : null}
+                {(payment as any).loanDeduction && Number((payment as any).loanDeduction) > 0 ? (
+                  <div className="flex justify-between text-red-600">
+                    <span>Potongan:</span> <span>-{formatCurrency(Number((payment as any).loanDeduction ?? 0))}</span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            <p className="font-bold text-slate-800 ml-4">{formatCurrency(payment.totalPay)}</p>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <p className="text-slate-400 text-sm italic mt-3">Tidak ada data karyawan.</p>
+    )}
+  </div>
+);
 
 const PayrollCardActions: React.FC<{
   payroll: WeeklyPayroll;
   onDelete: (id: string | number) => void;
-}> = ({ payroll, onDelete }) => {
-  const pid = (payroll as any).id ?? '';
-
-  return (
-    <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-end space-x-2 no-print">
-      <button
-        type="button"
-        onClick={() => onDelete(pid)}
-        className="flex items-center space-x-2 text-sm text-slate-600 hover:text-red-500 font-semibold py-2 px-3 rounded-lg hover:bg-red-50 transition-colors"
-      >
-        <TrashIcon className="w-4 h-4" />
-        <span>Hapus</span>
-      </button>
-
-      <button
-        type="button"
-        onClick={() => handleShareWhatsApp(payroll)}
-        className="flex items-center space-x-2 text-sm text-slate-600 hover:text-brand-secondary font-semibold py-2 px-3 rounded-lg hover:bg-emerald-50 transition-colors"
-      >
-        <ShareIcon className="w-4 h-4" />
-        <span>Bagikan</span>
-      </button>
-
-      <button
-        type="button"
-        onClick={() => handlePrint(pid)}
-        className="flex items-center space-x-2 text-sm text-slate-600 hover:text-brand-primary font-semibold py-2 px-3 rounded-lg hover:bg-indigo-50 transition-colors"
-      >
-        <PrintIcon className="w-4 h-4" />
-        <span>Cetak</span>
-      </button>
-    </div>
-  );
-};
+}> = ({ payroll, onDelete }) => (
+  <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-end space-x-2 no-print">
+    <button
+      onClick={() => onDelete(payroll.id)}
+      className="flex items-center space-x-2 text-sm text-slate-600 hover:text-red-500 font-semibold py-2 px-3 rounded-lg hover:bg-red-50 transition-colors"
+    >
+      <TrashIcon className="w-4 h-4" />
+      <span>Hapus</span>
+    </button>
+    <button
+      onClick={() => handleShareWhatsApp(payroll)}
+      className="flex items-center space-x-2 text-sm text-slate-600 hover:text-brand-secondary font-semibold py-2 px-3 rounded-lg hover:bg-emerald-50 transition-colors"
+    >
+      <ShareIcon className="w-4 h-4" />
+      <span>Bagikan</span>
+    </button>
+    <button
+      onClick={() => handlePrint(payroll.id)}
+      className="flex items-center space-x-2 text-sm text-slate-600 hover:text-brand-primary font-semibold py-2 px-3 rounded-lg hover:bg-indigo-50 transition-colors"
+    >
+      <PrintIcon className="w-4 h-4" />
+      <span>Cetak</span>
+    </button>
+  </div>
+);
 
 const WeeklyPayrollCard: React.FC<{
   payroll: WeeklyPayroll;
   onDelete: (id: string | number) => void;
-}> = ({ payroll, onDelete }) => {
-  const pid = String((payroll as any).id ?? '');
-  return (
-    <div id={`payroll-${pid}`} className="bg-white p-4 rounded-lg shadow-sm">
-      <PayrollCardContent payroll={payroll} />
-      <PayrollCardActions payroll={payroll} onDelete={onDelete} />
-    </div>
-  );
-};
+}> = ({ payroll, onDelete }) => (
+  <div id={`payroll-${payroll.id}`} className="bg-white p-4 rounded-lg shadow-sm">
+    <PayrollCardContent payroll={payroll} />
+    <PayrollCardActions payroll={payroll} onDelete={onDelete} />
+  </div>
+);
 
 const MonthlySummaryCard: React.FC<{
   monthYear: string;
@@ -226,7 +208,6 @@ const MonthlySummaryCard: React.FC<{
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-hidden">
       <button
-        type="button"
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full flex justify-between items-center p-4 text-left"
         aria-expanded={isExpanded}
@@ -249,7 +230,7 @@ const MonthlySummaryCard: React.FC<{
       >
         <div className="p-4 pt-0 space-y-4">
           {weeklyPayrolls.map((payroll) => (
-            <div key={(payroll as any).id ?? Math.random()} className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+            <div key={payroll.id} className="bg-slate-50 border border-slate-200 rounded-lg p-4">
               <PayrollCardContent payroll={payroll} />
               <PayrollCardActions payroll={payroll} onDelete={onDeletePayroll} />
             </div>
@@ -269,7 +250,7 @@ const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayro
       { totalPayroll: number; weeklyPayrolls: WeeklyPayroll[] }
     > = {};
 
-    payrolls.forEach((p: any) => {
+    payrolls.forEach((p) => {
       const monthYear = new Date(p.weekStartDate).toLocaleString('id-ID', {
         month: 'long',
         year: 'numeric',
@@ -283,8 +264,8 @@ const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayro
       .map(([monthYear, data]) => ({ monthYear, ...data }))
       .sort(
         (a, b) =>
-          new Date((b.weeklyPayrolls[0] as any).weekStartDate).getTime() -
-          new Date((a.weeklyPayrolls[0] as any).weekStartDate).getTime()
+          new Date(b.weeklyPayrolls[0].weekStartDate).getTime() -
+          new Date(a.weeklyPayrolls[0].weekStartDate).getTime()
       );
   }, [payrolls]);
 
@@ -297,7 +278,6 @@ const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayro
       {payrolls.length > 0 && (
         <div className="p-1 bg-slate-200 rounded-lg flex items-center">
           <button
-            type="button"
             onClick={() => setView('weekly')}
             className={`w-1/2 py-2 px-4 rounded-md text-sm font-semibold transition-colors ${
               view === 'weekly'
@@ -308,7 +288,6 @@ const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayro
             Mingguan
           </button>
           <button
-            type="button"
             onClick={() => setView('monthly')}
             className={`w-1/2 py-2 px-4 rounded-md text-sm font-semibold transition-colors ${
               view === 'monthly'
@@ -324,8 +303,8 @@ const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayro
       {payrolls.length > 0 ? (
         <div className="space-y-4">
           {view === 'weekly' &&
-            payrolls.map((p: any) => (
-              <WeeklyPayrollCard key={p.id ?? Math.random()} payroll={p} onDelete={onDeletePayroll} />
+            payrolls.map((p) => (
+              <WeeklyPayrollCard key={p.id} payroll={p} onDelete={onDeletePayroll} />
             ))}
           {view === 'monthly' &&
             monthlyData.map((d) => (
