@@ -1,18 +1,42 @@
+// app/api/employees/route.ts
 import { Pool } from "pg";
+import { NextResponse } from "next/server";
+
+export const runtime = "node"; // pg membutuhkan Node runtime
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 
-// ✅ GET semua karyawan
+// Helper response JSON + no-store bila perlu
+function json(data: any, status = 200, noStore = false) {
+  return new NextResponse(JSON.stringify(data), {
+    status,
+    headers: {
+      "content-type": "application/json",
+      ...(noStore ? { "cache-control": "no-store" } : {}),
+    },
+  });
+}
+
+// Normalisasi angka (>= 0)
+function toNonNegativeNumber(v: any, def = 0): number {
+  const n = Number(v);
+  if (Number.isFinite(n) && n >= 0) return n;
+  return def;
+}
+
+// ✅ GET semua karyawan (no-store supaya selalu segar)
 export async function GET() {
   try {
-    const result = await pool.query("SELECT * FROM employees ORDER BY id DESC");
-    return Response.json(result.rows);
+    const result = await pool.query(
+      "SELECT id, name, position, daily_rate, weekly_allowance, image_url FROM employees ORDER BY id DESC"
+    );
+    return json(result.rows, 200, true);
   } catch (error) {
     console.error("GET /api/employees error:", error);
-    return new Response("Database read error", { status: 500 });
+    return new NextResponse("Database read error", { status: 500 });
   }
 }
 
@@ -20,86 +44,107 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, position, daily_rate, weekly_allowance, image_url } = body;
+    let { name, position, daily_rate, weekly_allowance, image_url } = body || {};
 
-    // Kalau image_url kosong/null → pakai avatar default
+    name = (name ?? "").toString().trim();
+    position = (position ?? "").toString().trim();
+
+    if (!name) return new NextResponse("Name is required", { status: 400 });
+    if (!position) return new NextResponse("Position is required", { status: 400 });
+
+    const dailyRate = toNonNegativeNumber(daily_rate, 0);
+    const weeklyAllowance = toNonNegativeNumber(weekly_allowance, 0);
+
     const finalImageUrl =
-      image_url && image_url.trim() !== ""
-        ? image_url
-        : `https://ui-avatars.com/api/?name=${encodeURIComponent(
-            name
-          )}&background=random`;
+      image_url && image_url.toString().trim() !== ""
+        ? image_url.toString().trim()
+        : `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
 
     const result = await pool.query(
-      `INSERT INTO employees (name, position, daily_rate, weekly_allowance, image_url) 
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [name, position, daily_rate, weekly_allowance, finalImageUrl]
+      `INSERT INTO employees (name, position, daily_rate, weekly_allowance, image_url)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, name, position, daily_rate, weekly_allowance, image_url`,
+      [name, position, dailyRate, weeklyAllowance, finalImageUrl]
     );
 
-    return Response.json(result.rows[0]);
+    return json(result.rows[0], 201, true);
   } catch (error) {
     console.error("POST /api/employees error:", error);
-    return new Response("Database insert error", { status: 500 });
+    return new NextResponse("Database insert error", { status: 500 });
   }
 }
 
-// ✅ PUT update data karyawan
+// ✅ PUT update data karyawan (full update)
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { id, name, position, daily_rate, weekly_allowance, image_url } = body;
+    let { id, name, position, daily_rate, weekly_allowance, image_url } = body || {};
 
-    if (!id) {
-      return new Response("Employee ID is required", { status: 400 });
+    const employeeId = Number(id);
+    if (!Number.isFinite(employeeId) || employeeId <= 0) {
+      return new NextResponse("Employee ID is required", { status: 400 });
     }
 
+    name = (name ?? "").toString().trim();
+    position = (position ?? "").toString().trim();
+    if (!name) return new NextResponse("Name is required", { status: 400 });
+    if (!position) return new NextResponse("Position is required", { status: 400 });
+
+    const dailyRate = toNonNegativeNumber(daily_rate, 0);
+    const weeklyAllowance = toNonNegativeNumber(weekly_allowance, 0);
+
     const finalImageUrl =
-      image_url && image_url.trim() !== ""
-        ? image_url
-        : `https://ui-avatars.com/api/?name=${encodeURIComponent(
-            name
-          )}&background=random`;
+      image_url && image_url.toString().trim() !== ""
+        ? image_url.toString().trim()
+        : `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
 
     const result = await pool.query(
-      `UPDATE employees 
-       SET name = $1, position = $2, daily_rate = $3, weekly_allowance = $4, image_url = $5
-       WHERE id = $6 RETURNING *`,
-      [name, position, daily_rate, weekly_allowance, finalImageUrl, id]
+      `UPDATE employees
+         SET name = $1,
+             position = $2,
+             daily_rate = $3,
+             weekly_allowance = $4,
+             image_url = $5
+       WHERE id = $6
+       RETURNING id, name, position, daily_rate, weekly_allowance, image_url`,
+      [name, position, dailyRate, weeklyAllowance, finalImageUrl, employeeId]
     );
 
     if (result.rows.length === 0) {
-      return new Response("Employee not found", { status: 404 });
+      return new NextResponse("Employee not found", { status: 404 });
     }
 
-    return Response.json(result.rows[0]);
+    return json(result.rows[0], 200, true);
   } catch (error) {
     console.error("PUT /api/employees error:", error);
-    return new Response("Database update error", { status: 500 });
+    return new NextResponse("Database update error", { status: 500 });
   }
 }
 
 // ✅ DELETE hapus karyawan
 export async function DELETE(req: Request) {
   try {
-    const body = await req.json();
-    const { id } = body;
+    const body = await req.json().catch(() => ({}));
+    const employeeId = Number(body?.id);
 
-    if (!id) {
-      return new Response("Employee ID is required", { status: 400 });
+    if (!Number.isFinite(employeeId) || employeeId <= 0) {
+      return new NextResponse("Employee ID is required", { status: 400 });
     }
 
+    // Catatan: jika ada FK (mis. payroll.employee_id), pastikan ON DELETE RESTRICT/CASCADE sesuai kebutuhan
     const result = await pool.query(
-      `DELETE FROM employees WHERE id = $1 RETURNING *`,
-      [id]
+      `DELETE FROM employees WHERE id = $1
+       RETURNING id, name, position, daily_rate, weekly_allowance, image_url`,
+      [employeeId]
     );
 
     if (result.rows.length === 0) {
-      return new Response("Employee not found", { status: 404 });
+      return new NextResponse("Employee not found", { status: 404 });
     }
 
-    return Response.json({ success: true, deleted: result.rows[0] });
+    return json({ success: true, deleted: result.rows[0] }, 200, true);
   } catch (error) {
     console.error("DELETE /api/employees error:", error);
-    return new Response("Database delete error", { status: 500 });
+    return new NextResponse("Database delete error", { status: 500 });
   }
 }
