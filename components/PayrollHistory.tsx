@@ -102,7 +102,7 @@ function openWhatsApp(message: string, preferred?: "consumer" | "business") {
 }
 
 function sanitizeWAHeader(msg: string) {
-  const header = '🧾 *Slip Gaji Mingguan*\\n\\n';
+  const header = '*Slip Gaji Mingguan*\\n\\n';
   let out = msg;
   if (!out.startsWith(header)) {
     const sep = out.indexOf('\\n\\n');
@@ -215,6 +215,7 @@ const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
   const loanDeduction = Number(p.loanDeduction ?? 0);
 
   let message = `ðŸ§¾ *Slip Gaji Mingguan*\n\n`;
+  message = `*Slip Gaji Mingguan*\n\n`;
   message += `*Periode:* ${formatDateRange(weekStart, weekEnd)}\n\n`;
   message += `*Nama:* ${p.employeeName}\n*Jabatan:* ${p.position}\n*Hari Kerja:* ${p.daysWorked} hari\n`;
   message += `*Gaji Pokok:* ${formatCurrency(p.basePay)}\n`;
@@ -224,7 +225,7 @@ const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
   message += `*Total Diterima:* *${formatCurrency(p.totalPay)}*\n`;
 
     // Force a clean header and drop any mojibake prefix
-    const _header = '🧾 *Slip Gaji Mingguan*\\n\\n';
+    const _header = '*Slip Gaji Mingguan*\\n\\n';
     message = _header + message.replace(/^.*?\\n\\n/, '');
     return sanitizeWAHeader(message);
   };
@@ -232,6 +233,7 @@ const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
 // Share WhatsApp satu periode (semua karyawan)
   const buildWholePayrollWhatsAppMessage = (payroll: WeeklyPayroll) => {
   let message = `ðŸ§¾ *Slip Gaji Mingguan*\n\n`;
+  message = `*Slip Gaji Mingguan*\n\n`;
   message += `*Periode:* ${formatDateRange(payroll.weekStartDate, payroll.weekEndDate)}\n`;
   message += `*Total Gaji Dibayarkan:* ${formatCurrency(payroll.totalPayroll)}\n\n`;
   message += `*Rincian Karyawan:*\n-----------------------------------\n`;
@@ -250,7 +252,7 @@ const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
   });
 
     // Force a clean header and drop any mojibake prefix
-    const _header = '🧾 *Slip Gaji Mingguan*\\n\\n';
+    const _header = '*Slip Gaji Mingguan*\\n\\n';
     message = _header + message.replace(/^.*?\\n\\n/, '');
     return sanitizeWAHeader(message);
   };
