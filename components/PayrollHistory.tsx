@@ -76,7 +76,8 @@ const printWholePeriodSlip = (payroll: WeeklyPayroll) => {
       <style id="print-config"></style>
       <style>
         :root { color-scheme: light; }
-        body { margin:0; -webkit-print-color-adjust: exact; font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial; color:#0f172a; background:#ffffff; }
+        * { box-sizing: border-box; }
+        body { margin:0; min-height:100vh; -webkit-print-color-adjust: exact; font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial; color:#0f172a; background:#ffffff; }
         .toolbar { position: sticky; top:0; z-index:10; background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:8px 12px; display:flex; gap:8px; align-items:center; }
         .toolbar h1 { margin:0; font-size:14px; font-weight:600; color:#334155; }
         .btn { appearance:none; border:1px solid #cbd5e1; background:#ffffff; color:#0f172a; padding:6px 10px; border-radius:8px; cursor:pointer; font-weight:600; }
@@ -175,11 +176,35 @@ const printWholePeriodSlip = (payroll: WeeklyPayroll) => {
     </body>
   </html>`;
 
-  const w = window.open("", "_blank", "noopener,noreferrer,width=900,height=900");
-  if (!w) return;
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
+  let w: Window | null = null;
+  try {
+    w = window.open("", "_blank", "noopener,width=900,height=900");
+  } catch {}
+  if (!w) {
+    try {
+      const blob = new Blob([html], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      return;
+    } catch {
+      alert("Tidak bisa membuka jendela pratinjau cetak.");
+      return;
+    }
+  }
+  try {
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+  } catch {
+    try {
+      const blob = new Blob([html], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      w.location.href = url;
+    } catch {
+      // ignore
+    }
+  }
 };
 
 // ====== Util pilih target WhatsApp ======
@@ -247,7 +272,8 @@ const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
       <style id="print-config"></style>
       <style>
         :root { color-scheme: light; }
-        body { margin:0; -webkit-print-color-adjust: exact; font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial; color:#0f172a; background:#ffffff; }
+        * { box-sizing: border-box; }
+        body { margin:0; min-height:100vh; -webkit-print-color-adjust: exact; font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial; color:#0f172a; background:#ffffff; }
         .toolbar { position: sticky; top:0; z-index:10; background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:8px 12px; display:flex; gap:8px; align-items:center; }
         .toolbar h1 { margin:0; font-size:14px; font-weight:600; color:#334155; }
         .btn { appearance:none; border:1px solid #cbd5e1; background:#ffffff; color:#0f172a; padding:6px 10px; border-radius:8px; cursor:pointer; font-weight:600; }
@@ -358,11 +384,35 @@ const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
     </body>
   </html>`;
 
-  const w = window.open("", "_blank", "noopener,noreferrer,width=520,height=800");
-  if (!w) return;
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
+  let w: Window | null = null;
+  try {
+    w = window.open("", "_blank", "noopener,width=520,height=800");
+  } catch {}
+  if (!w) {
+    try {
+      const blob = new Blob([html], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      return;
+    } catch {
+      alert("Tidak bisa membuka jendela pratinjau cetak.");
+      return;
+    }
+  }
+  try {
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+  } catch {
+    try {
+      const blob = new Blob([html], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      w.location.href = url;
+    } catch {
+      // ignore
+    }
+  }
 };
 
 // ====== Build WhatsApp messages (Perbaikan newline) ======
