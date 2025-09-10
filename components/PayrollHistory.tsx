@@ -31,52 +31,155 @@ const formatDateRange = (start: string, end: string) => {
   )}`;
 };
 
-const handlePrintPeriod = (payrollId: string | number) => {
-  const card = document.getElementById(`payroll-${payrollId}`);
-  const content = card?.querySelector(".payroll-content-wrapper")?.cloneNode(true) as HTMLElement;
+// ============ CETAK SATU PERIODE (Preview terlebih dulu) ============
+const printWholePeriodSlip = (payroll: WeeklyPayroll) => {
+  if (!payroll) return;
+  const now = new Date().toLocaleString("id-ID");
+  const emp = Array.isArray(payroll.employeePayments) ? payroll.employeePayments : [];
 
-  if (!content) {
-    alert("Gagal menyiapkan data untuk dicetak.");
-    return;
-  }
+  const listItems = emp
+    .map((p: any) => {
+      const extra = Number(p.extraAllowance ?? 0);
+      const loan = Number(p.loanDeduction ?? 0);
+      const img = p.image_url
+        ? `<img src="${p.image_url}" alt="Foto" style="width:36px;height:36px;border-radius:9999px;object-fit:cover;margin-right:8px;" />`
+        : "";
+      return `
+        <div class="item">
+          <div class="row" style="align-items:center;margin-bottom:6px;">
+            <div style="display:flex;align-items:center;">
+              ${img}
+              <div>
+                <div class="emp-name">${p.employeeName}</div>
+                <div class="small muted">${p.position ?? '-'}</div>
+              </div>
+            </div>
+            <div class="emp-total">${formatCurrency(p.totalPay)}</div>
+          </div>
+          <div class="grid">
+            <div class="kv"><span>Hari Kerja</span><span>${p.daysWorked} hari</span></div>
+            <div class="kv"><span>Gaji Pokok</span><span>${formatCurrency(p.basePay)}</span></div>
+            <div class="kv"><span>Tunjangan</span><span>${formatCurrency(Number(p.totalAllowance ?? 0))}</span></div>
+            ${extra > 0 ? `<div class="kv"><span>Tunjangan Lain (THR/Bonus)</span><span>${formatCurrency(extra)}</span></div>` : ''}
+            ${loan > 0 ? `<div class="kv danger"><span>Potongan Pinjaman</span><span>-${formatCurrency(loan)}</span></div>` : ''}
+          </div>
+        </div>`;
+    })
+    .join("\n");
 
-  const iframe = document.createElement("iframe");
-  iframe.style.display = "none";
-  document.body.appendChild(iframe);
+  const html = `<!doctype html>
+  <html lang="id">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Slip Gaji Periode ${formatDateRange(payroll.weekStartDate, payroll.weekEndDate)}</title>
+      <style id="print-config"></style>
+      <style>
+        :root { color-scheme: light; }
+        body { margin:0; -webkit-print-color-adjust: exact; font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial; color:#0f172a; background:#ffffff; }
+        .toolbar { position: sticky; top:0; z-index:10; background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:8px 12px; display:flex; gap:8px; align-items:center; }
+        .toolbar h1 { margin:0; font-size:14px; font-weight:600; color:#334155; }
+        .btn { appearance:none; border:1px solid #cbd5e1; background:#ffffff; color:#0f172a; padding:6px 10px; border-radius:8px; cursor:pointer; font-weight:600; }
+        .btn:hover { background:#f1f5f9; }
+        .select { appearance:none; border:1px solid #cbd5e1; background:#ffffff; color:#0f172a; padding:6px 10px; border-radius:8px; font-weight:600; }
+        .container { max-width:900px; margin: 12px auto; padding: 12px; }
+        body.paper-80 .container { max-width: 76mm; }
+        body.paper-58 .container { max-width: 56mm; }
+        .card { border:1px solid #e2e8f0; border-radius:12px; padding:16px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .row { display:flex; justify-content:space-between; }
+        .muted { color:#64748b; }
+        .title { font-size:18px; font-weight:700; margin:0 0 2px 0; }
+        .small { font-size:12px; }
+        .section { margin-top:10px; padding-top:10px; border-top:1px solid #e2e8f0; }
+        .summary { display:flex; justify-content:space-between; gap:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px 12px; margin-top:8px; }
+        .summary > div { display:flex; gap:6px; align-items:center; font-weight:600; color:#334155; }
+        .items { margin-top:12px; display:grid; grid-template-columns:1fr; gap:12px; }
+        .item { border:1px solid #e2e8f0; border-radius:10px; padding:12px; }
+        .grid { display:grid; grid-template-columns: 1fr 1fr; gap:6px 16px; }
+        .kv { display:flex; justify-content:space-between; }
+        .emp-name { font-weight:600; }
+        .emp-total { font-weight:700; }
+        .danger { color:#dc2626; }
+        @media (max-width:640px){ .grid { grid-template-columns: 1fr; } }
+        @media print { .toolbar { display:none; } .container { margin:0 auto; padding:0; } .card { box-shadow:none; } }
+      </style>
+    </head>
+    <body>
+      <div class="toolbar">
+        <h1>Pratinjau Slip Gaji Periode</h1>
+        <label class="small muted" for="paperSelect">Ukuran Kertas:</label>
+        <select id="paperSelect" class="select">
+          <option value="a4">A4</option>
+          <option value="80">Struk 80mm</option>
+          <option value="58">Struk 58mm</option>
+        </select>
+        <button class="btn" onclick="window.print()">Cetak</button>
+        <button class="btn" onclick="window.close()">Tutup</button>
+      </div>
+      <div class="container">
+        <div class="card">
+          <div class="row" style="margin-bottom:8px;">
+            <div>
+              <h2 class="title">Slip Gaji Mingguan</h2>
+              <p class="small muted">Periode: ${formatDateRange(payroll.weekStartDate, payroll.weekEndDate)}</p>
+            </div>
+            <div style="text-align:right">
+              <p class="small muted" style="margin:0">Tanggal Cetak</p>
+              <p class="small" style="margin:0;font-weight:600">${now}</p>
+            </div>
+          </div>
+          <div class="summary">
+            <div><span>Total Karyawan:</span><span>${emp.length}</span></div>
+            <div><span>Total Gaji Dibayarkan:</span><span>${formatCurrency(payroll.totalPayroll)}</span></div>
+          </div>
+          <div class="items">${listItems || '<div class="small muted">Tidak ada data karyawan.</div>'}</div>
+        </div>
+      </div>
+      <script>
+        (function(){
+          const imgs = Array.from(document.images || []);
+          if (imgs.length === 0) return;
+          let left = imgs.length;
+          const tick = () => { left--; };
+          imgs.forEach(img => {
+            if (img.complete) { tick(); return; }
+            img.addEventListener('load', tick);
+            img.addEventListener('error', tick);
+          });
+        })();
 
-  const doc = iframe.contentWindow?.document;
-  if (!doc) return;
+        // Pengaturan ukuran kertas dinamis
+        (function(){
+          const style = document.getElementById('print-config');
+          const select = document.getElementById('paperSelect');
+          function apply(size){
+            document.body.classList.remove('paper-a4','paper-80','paper-58');
+            if(size==='80') {
+              document.body.classList.add('paper-80');
+              style.textContent = '@page { size: 80mm auto; margin: 5mm }';
+            } else if(size==='58') {
+              document.body.classList.add('paper-58');
+              style.textContent = '@page { size: 58mm auto; margin: 4mm }';
+            } else {
+              document.body.classList.add('paper-a4');
+              style.textContent = '@page { size: A4; margin: 16mm }';
+            }
+            try { localStorage.setItem('paper-size',''+size); } catch(e) {}
+          }
+          const initial = (function(){ try { return localStorage.getItem('paper-size') || 'a4'; } catch(e){ return 'a4'; } })();
+          select.value = initial;
+          apply(initial);
+          select.addEventListener('change', function(){ apply(this.value); });
+        })();
+      </script>
+    </body>
+  </html>`;
 
-  doc.open();
-  doc.write("<html><head><title>Cetak Slip Gaji</title></head><body></body></html>");
-  doc.close();
-
-  const tailwindScript = doc.createElement("script");
-  tailwindScript.src = "https://cdn.tailwindcss.com";
-  doc.head.appendChild(tailwindScript);
-
-  const style = doc.createElement("style");
-  style.textContent =
-    `@page{margin:16mm}body{-webkit-print-color-adjust:exact;font-family:sans-serif}.print-container{padding:1rem;max-width:720px;margin:0 auto;}`;
-  doc.head.appendChild(style);
-
-  const container = doc.createElement("div");
-  container.className = "print-container";
-  container.appendChild(content);
-  doc.body.appendChild(container);
-
-  tailwindScript.onload = () => {
-    setTimeout(() => {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
-      setTimeout(() => document.body.removeChild(iframe), 800);
-    }, 350);
-  };
-
-  tailwindScript.onerror = () => {
-    alert("Gagal memuat gaya cetak.");
-    document.body.removeChild(iframe);
-  };
+  const w = window.open("", "_blank", "noopener,noreferrer,width=900,height=900");
+  if (!w) return;
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
 };
 
 // ====== Util pilih target WhatsApp ======
@@ -128,85 +231,134 @@ function sanitizeWAHeader(msg: string) {
 
 type WAChoice = "consumer" | "business";
 
-// ============ CETAK PER KARYAWAN (BARU) ============
+// ============ CETAK PER KARYAWAN (Preview terlebih dulu) ============
 const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
-  const html = `
-  <html>
+  const now = new Date().toLocaleString("id-ID");
+  const imgHtml = p.image_url
+    ? `<img src="${p.image_url}" alt="Foto" style="width:48px;height:48px;border-radius:9999px;object-fit:cover;" />`
+    : "";
+
+  const html = `<!doctype html>
+  <html lang="id">
     <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
       <title>Slip Gaji - ${p.employeeName}</title>
-      <script src="https://cdn.tailwindcss.com"></script>
+      <style id="print-config"></style>
       <style>
-        @page { margin: 16mm }
-        body { -webkit-print-color-adjust: exact; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial }
+        :root { color-scheme: light; }
+        body { margin:0; -webkit-print-color-adjust: exact; font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial; color:#0f172a; background:#ffffff; }
+        .toolbar { position: sticky; top:0; z-index:10; background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:8px 12px; display:flex; gap:8px; align-items:center; }
+        .toolbar h1 { margin:0; font-size:14px; font-weight:600; color:#334155; }
+        .btn { appearance:none; border:1px solid #cbd5e1; background:#ffffff; color:#0f172a; padding:6px 10px; border-radius:8px; cursor:pointer; font-weight:600; }
+        .btn:hover { background:#f1f5f9; }
+        .select { appearance:none; border:1px solid #cbd5e1; background:#ffffff; color:#0f172a; padding:6px 10px; border-radius:8px; font-weight:600; }
+        .container { max-width:720px; margin: 12px auto; padding: 12px; }
+        body.paper-80 .container { max-width: 76mm; }
+        body.paper-58 .container { max-width: 56mm; }
+        .card { border:1px solid #e2e8f0; border-radius:12px; padding:16px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .row { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+        .muted { color:#64748b; }
+        .title { font-size:18px; font-weight:700; margin:0 0 2px 0; }
+        .small { font-size:12px; }
+        .section { margin-top:10px; padding-top:10px; border-top:1px solid #e2e8f0; }
+        .kv { display:flex; justify-content:space-between; padding:6px 0; }
+        .total { font-weight:700; font-size:16px; }
+        .danger { color:#dc2626; }
+        .note { margin-top:16px; font-size:10px; color:#94a3b8; }
+        @media print {
+          .toolbar { display:none; }
+          .container { margin:0 auto; padding: 0; }
+          .card { box-shadow:none; }
+        }
       </style>
     </head>
-    <body class="bg-white">
-      <div class="max-w-md mx-auto p-6">
-        <div class="border rounded-xl p-5 shadow">
-          <div class="flex items-center justify-between mb-3">
+    <body>
+      <div class="toolbar">
+        <h1>Pratinjau Slip Gaji</h1>
+        <label class="small muted" for="paperSelect">Ukuran Kertas:</label>
+        <select id="paperSelect" class="select">
+          <option value="a4">A4</option>
+          <option value="80">Struk 80mm</option>
+          <option value="58">Struk 58mm</option>
+        </select>
+        <button class="btn" onclick="window.print()">Cetak</button>
+        <button class="btn" onclick="window.close()">Tutup</button>
+      </div>
+      <div class="container">
+        <div class="card">
+          <div class="row" style="margin-bottom:8px;">
             <div>
-              <h1 class="text-lg font-bold text-slate-800">Slip Gaji Mingguan</h1>
-              <p class="text-sm text-slate-500">${formatDateRange(weekStart, weekEnd)}</p>
+              <h2 class="title">Slip Gaji Mingguan</h2>
+              <p class="small muted">${formatDateRange(weekStart, weekEnd)}</p>
             </div>
-            <div class="text-right">
-              <p class="text-xs text-slate-500">Tanggal Cetak</p>
-              <p class="text-sm font-medium">${new Date().toLocaleString("id-ID")}</p>
+            <div style="text-align:right">
+              <p class="small muted" style="margin:0">Tanggal Cetak</p>
+              <p class="small" style="margin:0;font-weight:600">${now}</p>
             </div>
           </div>
 
-          <div class="flex items-center gap-3 mb-4">
-            ${p.image_url ? `<img src="${p.image_url}" class="w-12 h-12 rounded-full object-cover" />` : ""}
+          <div class="row" style="margin-bottom:12px; align-items:center;">
+            ${imgHtml}
             <div>
-              <p class="font-semibold text-slate-800">${p.employeeName}</p>
-              <p class="text-xs text-slate-500">${p.position ?? "-"}</p>
+              <p style="margin:0;font-weight:600">${p.employeeName}</p>
+              <p class="small muted" style="margin:2px 0 0 0;">${p.position ?? "-"}</p>
             </div>
           </div>
 
-          <div class="text-sm divide-y divide-slate-200">
-            <div class="flex justify-between py-2">
-              <span class="text-slate-600">Hari Kerja</span>
-              <span class="font-medium">${p.daysWorked} hari</span>
-            </div>
-            <div class="flex justify-between py-2">
-              <span class="text-slate-600">Gaji Pokok</span>
-              <span class="font-medium">${formatCurrency(p.basePay)}</span>
-            </div>
-            <div class="flex justify-between py-2">
-              <span class="text-slate-600">Tunjangan</span>
-              <span class="font-medium">${formatCurrency(Number(p.totalAllowance ?? 0))}</span>
-            </div>
-            ${
-              Number(p.extraAllowance ?? 0) > 0
-                ? `<div class="flex justify-between py-2">
-                     <span class="text-slate-600">Tunjangan Lain (THR/Bonus)</span>
-                     <span class="font-medium">${formatCurrency(Number(p.extraAllowance ?? 0))}</span>
-                   </div>`
-                : ""
-            }
-            ${
-              Number(p.loanDeduction ?? 0) > 0
-                ? `<div class="flex justify-between py-2 text-red-600">
-                     <span>Potongan Pinjaman</span>
-                     <span>-${formatCurrency(Number(p.loanDeduction ?? 0))}</span>
-                   </div>`
-                : ""
-            }
-            <div class="flex justify-between py-2 text-base">
-              <span class="font-semibold text-slate-700">Total Diterima</span>
-              <span class="font-bold text-slate-900">${formatCurrency(p.totalPay)}</span>
-            </div>
+          <div class="section">
+            <div class="kv"><span class="muted">Hari Kerja</span><span style="font-weight:600">${p.daysWorked} hari</span></div>
+            <div class="kv"><span class="muted">Gaji Pokok</span><span style="font-weight:600">${formatCurrency(p.basePay)}</span></div>
+            <div class="kv"><span class="muted">Tunjangan</span><span style="font-weight:600">${formatCurrency(Number(p.totalAllowance ?? 0))}</span></div>
+            ${Number(p.extraAllowance ?? 0) > 0 ? `<div class="kv"><span class="muted">Tunjangan Lain (THR/Bonus)</span><span style="font-weight:600">${formatCurrency(Number(p.extraAllowance ?? 0))}</span></div>` : ""}
+            ${Number(p.loanDeduction ?? 0) > 0 ? `<div class="kv danger"><span>Potongan Pinjaman</span><span>-${formatCurrency(Number(p.loanDeduction ?? 0))}</span></div>` : ""}
+            <div class="kv total"><span style="color:#334155">Total Diterima</span><span>${formatCurrency(p.totalPay)}</span></div>
           </div>
 
-          <p class="mt-6 text-[10px] text-slate-400">Dokumen ini dicetak otomatis dari sistem. Tidak memerlukan tanda tangan.</p>
+          <p class="note">Dokumen ini dihasilkan otomatis dari sistem dan tidak memerlukan tanda tangan.</p>
         </div>
       </div>
       <script>
-        window.addEventListener('load', () => { window.print(); setTimeout(() => window.close(), 300); });
+        // Pastikan gambar (jika ada) sudah termuat agar tidak blank saat print
+        (function(){
+          const imgs = Array.from(document.images || []);
+          if (imgs.length === 0) return;
+          let loaded = 0; const done = () => { /* noop: user klik Cetak */ };
+          imgs.forEach(img => {
+            if (img.complete) { loaded++; if (loaded === imgs.length) done(); return; }
+            img.addEventListener('load', () => { loaded++; if (loaded === imgs.length) done(); });
+            img.addEventListener('error', () => { loaded++; if (loaded === imgs.length) done(); });
+          });
+        })();
+
+        // Pengaturan ukuran kertas dinamis
+        (function(){
+          const style = document.getElementById('print-config');
+          const select = document.getElementById('paperSelect');
+          function apply(size){
+            document.body.classList.remove('paper-a4','paper-80','paper-58');
+            if(size==='80') {
+              document.body.classList.add('paper-80');
+              style.textContent = '@page { size: 80mm auto; margin: 5mm }';
+            } else if(size==='58') {
+              document.body.classList.add('paper-58');
+              style.textContent = '@page { size: 58mm auto; margin: 4mm }';
+            } else {
+              document.body.classList.add('paper-a4');
+              style.textContent = '@page { size: A4; margin: 16mm }';
+            }
+            try { localStorage.setItem('paper-size',''+size); } catch(e) {}
+          }
+          const initial = (function(){ try { return localStorage.getItem('paper-size') || 'a4'; } catch(e){ return 'a4'; } })();
+          select.value = initial;
+          apply(initial);
+          select.addEventListener('change', function(){ apply(this.value); });
+        })();
       </script>
     </body>
-  </html>`.trim();
+  </html>`;
 
-  const w = window.open("", "_blank", "noopener,noreferrer,width=480,height=720");
+  const w = window.open("", "_blank", "noopener,noreferrer,width=520,height=800");
   if (!w) return;
   w.document.open();
   w.document.write(html);
@@ -386,7 +538,7 @@ const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayro
                   setWaChooserOpen(true);
                 }}
                 onPrintOne={printOneEmployeeSlip}
-                onPrintPeriod={handlePrintPeriod}
+                onPrintPeriod={printWholePeriodSlip}
               />
             ))}
 
@@ -410,7 +562,7 @@ const PayrollHistory: React.FC<PayrollHistoryProps> = ({ payrolls, onDeletePayro
                   setWaChooserOpen(true);
                 }}
                 onPrintOne={printOneEmployeeSlip}
-                onPrintPeriod={handlePrintPeriod}
+                onPrintPeriod={printWholePeriodSlip}
               />
             ))}
         </div>
@@ -529,7 +681,7 @@ const PayrollCardActions: React.FC<{
   payroll: WeeklyPayroll;
   onDeletePeriod: (id: string | number) => void;
   onShareAll: (payroll: WeeklyPayroll) => void;
-  onPrintPeriod: (payrollId: string | number) => void;
+  onPrintPeriod: (payroll: WeeklyPayroll) => void;
 }> = ({ payroll, onDeletePeriod, onShareAll, onPrintPeriod }) => (
   <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-end space-x-2 no-print">
     <button
@@ -547,7 +699,7 @@ const PayrollCardActions: React.FC<{
       <span>Bagikan Semua</span>
     </button>
     <button
-      onClick={() => onPrintPeriod(payroll.id)}
+      onClick={() => onPrintPeriod(payroll)}
       className="flex items-center space-x-2 text-sm text-slate-600 hover:text-brand-primary font-semibold py-2 px-3 rounded-lg hover:bg-indigo-50 transition-colors"
     >
       <PrintIcon className="w-4 h-4" />
@@ -563,7 +715,7 @@ const WeeklyPayrollCard: React.FC<{
   onShareOne: (ws: string, we: string, p: any) => void;
   onShareAll: (payroll: WeeklyPayroll) => void;
   onPrintOne: (ws: string, we: string, p: any) => void;
-  onPrintPeriod: (payrollId: string | number) => void;
+  onPrintPeriod: (payroll: WeeklyPayroll) => void;
 }> = ({ payroll, onDeletePeriod, onDeleteOne, onShareOne, onShareAll, onPrintOne, onPrintPeriod }) => (
   <div id={`payroll-${payroll.id}`} className="bg-white p-4 rounded-lg shadow-sm">
     <PayrollCardContent payroll={payroll} onDeleteOne={onDeleteOne} onShareOne={onShareOne} onPrintOne={onPrintOne} />
@@ -580,7 +732,7 @@ const MonthlySummaryCard: React.FC<{
   onShareOne: (ws: string, we: string, p: any) => void;
   onShareAll: (payroll: WeeklyPayroll) => void;
   onPrintOne: (ws: string, we: string, p: any) => void;
-  onPrintPeriod: (payrollId: string | number) => void;
+  onPrintPeriod: (payroll: WeeklyPayroll) => void;
 }> = ({ monthYear, totalPayroll, weeklyPayrolls, onDeletePeriod, onDeleteOne, onShareOne, onShareAll, onPrintOne, onPrintPeriod }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
