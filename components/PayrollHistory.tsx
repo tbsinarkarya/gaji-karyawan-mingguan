@@ -115,7 +115,7 @@ const printWholePeriodSlip = (payroll: WeeklyPayroll) => {
           <option value="58">Struk 58mm</option>
         </select>
         <button class="btn" onclick="window.print()">Cetak</button>
-        <button class="btn" onclick="window.close()">Tutup</button>
+        <button class="btn" onclick="try{parent.postMessage({__printOverlayClose:true},'*')}catch(e){};try{window.close()}catch(e){}">Tutup</button>
       </div>
       <div class="container">
         <div class="card">
@@ -176,35 +176,17 @@ const printWholePeriodSlip = (payroll: WeeklyPayroll) => {
     </body>
   </html>`;
 
+  // Android: gunakan overlay iframe agar stabil
+  if (isAndroid()) {
+    openPrintOverlay(html);
+    return;
+  }
+  // Non-Android: tetap coba window.open, jika gagal -> overlay
   let w: Window | null = null;
-  try {
-    w = window.open("", "_blank", "noopener,width=900,height=900");
-  } catch {}
-  if (!w) {
-    try {
-      const blob = new Blob([html], { type: "text/html" });
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-      return;
-    } catch {
-      alert("Tidak bisa membuka jendela pratinjau cetak.");
-      return;
-    }
-  }
-  try {
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-  } catch {
-    try {
-      const blob = new Blob([html], { type: "text/html" });
-      const url = URL.createObjectURL(blob);
-      w.location.href = url;
-    } catch {
-      // ignore
-    }
-  }
+  try { w = window.open("", "_blank", "noopener,width=900,height=900"); } catch {}
+  if (!w) { openPrintOverlay(html); return; }
+  try { w.document.open(); w.document.write(html); w.document.close(); w.focus(); }
+  catch { openPrintOverlay(html); }
 };
 
 // ====== Util pilih target WhatsApp ======
@@ -255,6 +237,105 @@ function sanitizeWAHeader(msg: string) {
 }
 
 type WAChoice = "consumer" | "business";
+
+// ============ Preview overlay (iframe) untuk Android ============
+function openPrintOverlay(html: string) {
+  try {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = [
+      'position:fixed',
+      'inset:0',
+      'background:rgba(15,23,42,0.6)',
+      'z-index:999999',
+      'display:flex',
+      'align-items:center',
+      'justify-content:center',
+      'padding:16px',
+    ].join(';');
+
+    const frameWrap = document.createElement('div');
+    frameWrap.style.cssText = [
+      'position:relative',
+      'width:min(100%, 960px)',
+      'height:92vh',
+      'background:#ffffff',
+      'border-radius:12px',
+      'box-shadow:0 20px 40px rgba(0,0,0,0.3)',
+      'overflow:hidden',
+      'display:flex',
+      'flex-direction:column',
+    ].join(';');
+
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '×';
+    closeBtn.setAttribute('aria-label', 'Tutup pratinjau');
+    closeBtn.style.cssText = [
+      'position:absolute',
+      'top:6px',
+      'right:10px',
+      'width:32px',
+      'height:32px',
+      'border-radius:8px',
+      'border:1px solid #cbd5e1',
+      'background:#ffffff',
+      'color:#0f172a',
+      'font-size:20px',
+      'line-height:28px',
+      'cursor:pointer',
+      'z-index:2',
+    ].join(';');
+
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('title', 'Pratinjau Cetak');
+    iframe.style.cssText = 'border:0; width:100%; height:100%; background:#ffffff;';
+
+    // Gunakan srcdoc jika didukung, fallback ke Blob URL
+    try {
+      // @ts-ignore - older TS may not know srcdoc
+      if ('srcdoc' in iframe) {
+        // @ts-ignore
+        iframe.srcdoc = html;
+      } else {
+        const blob = new Blob([html], { type: 'text/html' });
+        iframe.src = URL.createObjectURL(blob);
+      }
+    } catch {
+      const blob = new Blob([html], { type: 'text/html' });
+      iframe.src = URL.createObjectURL(blob);
+    }
+
+    frameWrap.appendChild(iframe);
+    frameWrap.appendChild(closeBtn);
+    overlay.appendChild(frameWrap);
+    document.body.appendChild(overlay);
+
+    const prevOverflow = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+
+    function cleanup() {
+      try { window.removeEventListener('message', onMessage as any); } catch {}
+      try { document.documentElement.style.overflow = prevOverflow; } catch {}
+      try { overlay.remove(); } catch {}
+    }
+
+    function onMessage(e: MessageEvent) {
+      try {
+        if (e && (e as any).data && (e as any).data.__printOverlayClose) {
+          cleanup();
+        }
+      } catch {}
+    }
+    window.addEventListener('message', onMessage as any);
+
+    closeBtn.addEventListener('click', cleanup);
+
+    return { iframe, cleanup };
+  } catch (e) {
+    console.error('Gagal membuat overlay cetak:', e);
+    alert('Gagal menampilkan pratinjau cetak.');
+    return null;
+  }
+}
 
 // ============ CETAK PER KARYAWAN (Preview terlebih dulu) ============
 const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
@@ -309,7 +390,7 @@ const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
           <option value="58">Struk 58mm</option>
         </select>
         <button class="btn" onclick="window.print()">Cetak</button>
-        <button class="btn" onclick="window.close()">Tutup</button>
+        <button class="btn" onclick="try{parent.postMessage({__printOverlayClose:true},'*')}catch(e){};try{window.close()}catch(e){}">Tutup</button>
       </div>
       <div class="container">
         <div class="card">
@@ -384,35 +465,17 @@ const printOneEmployeeSlip = (weekStart: string, weekEnd: string, p: any) => {
     </body>
   </html>`;
 
+  // Android: gunakan overlay iframe agar stabil
+  if (isAndroid()) {
+    openPrintOverlay(html);
+    return;
+  }
+  // Non-Android: tetap coba window.open, jika gagal -> overlay
   let w: Window | null = null;
-  try {
-    w = window.open("", "_blank", "noopener,width=520,height=800");
-  } catch {}
-  if (!w) {
-    try {
-      const blob = new Blob([html], { type: "text/html" });
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-      return;
-    } catch {
-      alert("Tidak bisa membuka jendela pratinjau cetak.");
-      return;
-    }
-  }
-  try {
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-  } catch {
-    try {
-      const blob = new Blob([html], { type: "text/html" });
-      const url = URL.createObjectURL(blob);
-      w.location.href = url;
-    } catch {
-      // ignore
-    }
-  }
+  try { w = window.open("", "_blank", "noopener,width=520,height=800"); } catch {}
+  if (!w) { openPrintOverlay(html); return; }
+  try { w.document.open(); w.document.write(html); w.document.close(); w.focus(); }
+  catch { openPrintOverlay(html); }
 };
 
 // ====== Build WhatsApp messages (Perbaikan newline) ======
