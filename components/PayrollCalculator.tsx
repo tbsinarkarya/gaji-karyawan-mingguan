@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { Employee } from '@/types';
 import TrashIcon from './icons/TrashIcon.tsx';
 
@@ -40,6 +40,8 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
     extraAllowance: '',   // manual selalu
     loanDeduction: '0',
   });
+  const [periodStart, setPeriodStart] = useState<string>('');
+  const [periodEnd, setPeriodEnd] = useState<string>('');
 
   const selectedEmployee = useMemo(
     () => employees.find(e => e.id === selectedEmployeeId),
@@ -54,6 +56,8 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
   const handleEmployeeSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedEmployeeId(Number(e.target.value));
     setCurrentInputs({ daysWorked: '', totalAllowance: '', extraAllowance: '', loanDeduction: '0' });
+    setPeriodStart('');
+    setPeriodEnd('');
   };
 
   const handleInputChange = (field: keyof typeof currentInputs, value: string) => {
@@ -100,6 +104,8 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
     setStagedPayments(prev => [...prev, newPayment].sort((a, b) => a.employeeName.localeCompare(b.employeeName)));
     setSelectedEmployeeId(null);
     setCurrentInputs({ daysWorked: '', totalAllowance: '', extraAllowance: '', loanDeduction: '0' });
+    setPeriodStart('');
+    setPeriodEnd('');
   };
 
   const handleRemoveFromStaged = (employeeId: number) => {
@@ -119,6 +125,19 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
   );
 
   const isAllowanceDisabled = parseInt(currentInputs.daysWorked, 10) === 6;
+
+  // Otomatis isi jumlah hari berdasarkan periode tanggal
+  useEffect(() => {
+    if (!periodStart || !periodEnd) return;
+    const start = new Date(`${periodStart}T00:00:00`);
+    const end = new Date(`${periodEnd}T00:00:00`);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
+    if (end < start) return;
+    const diffDays = Math.floor((end.getTime() - start.getTime()) / 86400000) + 1; // inklusif
+    const bounded = Math.max(1, Math.min(7, diffDays));
+    // Reuse logic untuk mengatur tunjangan saat 6 hari
+    handleInputChange('daysWorked', String(bounded));
+  }, [periodStart, periodEnd]);
 
   return (
     <div className="space-y-6">
@@ -159,15 +178,38 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
                 {/* Hari Kerja */}
                 <div>
                   <label className="text-xs text-slate-600 font-medium ml-1 mb-1 block">Hari Kerja</label>
-                  <input
-                    type="number"
-                    placeholder="Jumlah hari"
-                    value={currentInputs.daysWorked}
-                    onChange={e => handleInputChange('daysWorked', e.target.value)}
-                    className="w-full pl-4 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent transition"
-                    min={1}
-                    max={7}
-                  />
+                  <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+                    <div className="sm:w-40">
+                      <input
+                        type="number"
+                        placeholder="Jumlah hari"
+                        value={currentInputs.daysWorked}
+                        onChange={e => handleInputChange('daysWorked', e.target.value)}
+                        className="w-full pl-4 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent transition"
+                        min={1}
+                        max={7}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-[11px] text-slate-600 font-medium ml-1 mb-1 block">Tanggal Periode</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="date"
+                          value={periodStart}
+                          onChange={e => setPeriodStart(e.target.value)}
+                          className="px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                        />
+                        <span className="text-slate-500">s/d</span>
+                        <input
+                          type="date"
+                          value={periodEnd}
+                          onChange={e => setPeriodEnd(e.target.value)}
+                          className="px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1">Mengisi otomatis kolom jumlah hari (maks. 7)</p>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Tabel compact untuk Tunjangan / Tunjangan Lain / Potongan */}
