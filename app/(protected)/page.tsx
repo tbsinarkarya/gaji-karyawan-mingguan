@@ -160,12 +160,16 @@ export default function Page() {
 
   // --- Payroll ---
   const handleProcessPayroll = useCallback(
-    async (employeePayments: PayrollPayload[]) => {
+    async (
+      employeePayments: PayrollPayload[],
+      weekStartDate: string,
+      weekEndDate: string
+    ) => {
       try {
         const res = await fetch("/api/payrolls", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ employeePayments }),
+          body: JSON.stringify({ employeePayments, weekStartDate, weekEndDate }),
         });
         if (!res.ok) throw new Error("Gagal proses payroll");
         const newPayroll: WeeklyPayroll = await res.json();

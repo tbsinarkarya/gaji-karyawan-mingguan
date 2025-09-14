@@ -12,7 +12,11 @@ interface PayrollPayload {
 
 interface PayrollCalculatorProps {
   employees: Employee[];
-  onProcessPayroll: (employeePayments: PayrollPayload[]) => void;
+  onProcessPayroll: (
+    employeePayments: PayrollPayload[],
+    weekStartDate: string,
+    weekEndDate: string
+  ) => void;
 }
 
 interface StagedPayment extends PayrollPayload {
@@ -115,7 +119,20 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
   const handleSubmit = () => {
     if (stagedPayments.length === 0) return alert('Tambahkan setidaknya satu karyawan ke daftar gaji.');
     const payload: PayrollPayload[] = stagedPayments.map(({ employeeName, totalPay, ...rest }) => rest);
-    onProcessPayroll(payload);
+    // Tentukan periode minggu: selalu Senin–Sabtu, tgl akhir = Sabtu
+    const base = (periodEnd || periodStart) ? new Date(`${(periodEnd || periodStart)}T00:00:00`) : new Date();
+    const dow = base.getDay(); // 0=Sun..6=Sat
+    // Dapatkan Sabtu pada minggu yang sama dengan 'base'
+    const saturday = new Date(base);
+    saturday.setDate(base.getDate() + (6 - dow));
+    // Dapatkan Senin pada minggu yang sama (6 hari sebelum Sabtu)
+    const monday = new Date(saturday);
+    monday.setDate(saturday.getDate() - 5);
+
+    const ws = monday.toISOString().slice(0, 10);
+    const we = saturday.toISOString().slice(0, 10);
+
+    onProcessPayroll(payload, ws, we);
     setStagedPayments([]);
   };
 
@@ -196,25 +213,33 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
                   />
                 </div>
 
-                {/* Tanggal Periode (opsional, 1 kolom penuh) */}
+                {/* Tanggal Periode (1 input: Akhir/Sabtu) */}
                 <div>
-                  <label className="text-xs text-slate-600 font-medium ml-1 mb-1 block">Tanggal Periode</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="date"
-                      value={periodStart}
-                      onChange={e => setPeriodStart(e.target.value)}
-                      className="px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-transparent"
-                    />
-                    <span className="text-slate-500">s/d</span>
-                    <input
-                      type="date"
-                      value={periodEnd}
-                      onChange={e => setPeriodEnd(e.target.value)}
-                      className="px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-transparent"
-                    />
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-1">Mengisi otomatis jumlah hari kerja (maks. 6). Minggu tidak dihitung.</p>
+                  <label className="text-xs text-slate-600 font-medium ml-1 mb-1 block">Akhir Periode (Sabtu)</label>
+                  <input
+                    type="date"
+                    value={periodEnd}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setPeriodEnd(val);
+                      if (val) {
+                        const end = new Date(`${val}T00:00:00`);
+                        const dow = end.getDay(); // 0..6
+                        // Snap ke Sabtu pada minggu yang sama
+                        const saturday = new Date(end);
+                        saturday.setDate(end.getDate() + (6 - dow));
+                        // Senin adalah 5 hari sebelum Sabtu
+                        const monday = new Date(saturday);
+                        monday.setDate(saturday.getDate() - 5);
+                        setPeriodStart(monday.toISOString().slice(0, 10));
+                        setPeriodEnd(saturday.toISOString().slice(0, 10));
+                      } else {
+                        setPeriodStart('');
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">Periode otomatis diset Senin–Sabtu. Minggu tidak dihitung.</p>
                 </div>
 
                 {/* Tabel compact untuk Tunjangan / Tunjangan Lain / Potongan */}
