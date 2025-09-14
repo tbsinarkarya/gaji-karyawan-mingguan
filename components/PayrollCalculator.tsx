@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Employee } from '@/types';
 import TrashIcon from './icons/TrashIcon.tsx';
 
@@ -44,8 +44,6 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
     extraAllowance: '',   // manual selalu
     loanDeduction: '0',
   });
-  const [periodStart, setPeriodStart] = useState<string>('');
-  const [periodEnd, setPeriodEnd] = useState<string>('');
 
   const selectedEmployee = useMemo(
     () => employees.find(e => e.id === selectedEmployeeId),
@@ -58,10 +56,14 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
   );
 
   const handleEmployeeSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedEmployeeId(Number(e.target.value));
-    setCurrentInputs({ daysWorked: '', totalAllowance: '', extraAllowance: '', loanDeduction: '0' });
-    setPeriodStart('');
-    setPeriodEnd('');
+    const id = Number(e.target.value);
+    setSelectedEmployeeId(id);
+    const emp = employees.find(x => x.id === id);
+    const autoAllowance = emp && typeof (emp as any).weekly_allowance === 'number'
+      ? String((emp as any).weekly_allowance)
+      : '';
+    // Default ke 6 hari kerja dan auto isi tunjangan mingguan
+    setCurrentInputs({ daysWorked: '6', totalAllowance: autoAllowance, extraAllowance: '', loanDeduction: '0' });
   };
 
   const handleInputChange = (field: keyof typeof currentInputs, value: string) => {
@@ -70,7 +72,7 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
       let allowance = currentInputs.totalAllowance;
 
       if (days === 6 && selectedEmployee) {
-        allowance = (selectedEmployee.weekly_allowance ?? 0).toString();
+        allowance = ((selectedEmployee as any).weekly_allowance ?? 0).toString();
       } else if (days !== 6) {
         allowance = '';
       }
@@ -92,12 +94,12 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
     const extraAllowance = parseRupiah(currentInputs.extraAllowance);
     const loanDeduction = parseRupiah(currentInputs.loanDeduction);
 
-    const basePay = (selectedEmployee.daily_rate ?? 0) * daysWorked;
+    const basePay = ((selectedEmployee as any).daily_rate ?? 0) * daysWorked;
     const totalPay = basePay + totalAllowance + extraAllowance - loanDeduction;
 
     const newPayment: StagedPayment = {
-      employeeId: selectedEmployee.id,
-      employeeName: selectedEmployee.name,
+      employeeId: (selectedEmployee as any).id,
+      employeeName: (selectedEmployee as any).name,
       daysWorked,
       totalAllowance,
       extraAllowance,
@@ -108,30 +110,34 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
     setStagedPayments(prev => [...prev, newPayment].sort((a, b) => a.employeeName.localeCompare(b.employeeName)));
     setSelectedEmployeeId(null);
     setCurrentInputs({ daysWorked: '', totalAllowance: '', extraAllowance: '', loanDeduction: '0' });
-    setPeriodStart('');
-    setPeriodEnd('');
   };
 
   const handleRemoveFromStaged = (employeeId: number) => {
     setStagedPayments(prev => prev.filter(p => p.employeeId !== employeeId));
   };
 
+  // Tentukan Senin–Sabtu pekan berjalan; jika hari ini Minggu, gunakan Sabtu kemarin
+  const getCurrentWeekMondaySaturday = () => {
+    const today = new Date();
+    const base = new Date(today);
+    if (base.getDay() === 0) {
+      base.setDate(base.getDate() - 1);
+    }
+    const dow = base.getDay(); // 1..6 untuk Mon..Sat
+    const saturday = new Date(base);
+    saturday.setDate(base.getDate() + (6 - dow));
+    const monday = new Date(saturday);
+    monday.setDate(saturday.getDate() - 5);
+    return {
+      ws: monday.toISOString().slice(0, 10),
+      we: saturday.toISOString().slice(0, 10),
+    };
+  };
+
   const handleSubmit = () => {
     if (stagedPayments.length === 0) return alert('Tambahkan setidaknya satu karyawan ke daftar gaji.');
     const payload: PayrollPayload[] = stagedPayments.map(({ employeeName, totalPay, ...rest }) => rest);
-    // Tentukan periode minggu: selalu Senin–Sabtu, tgl akhir = Sabtu
-    const base = (periodEnd || periodStart) ? new Date(`${(periodEnd || periodStart)}T00:00:00`) : new Date();
-    const dow = base.getDay(); // 0=Sun..6=Sat
-    // Dapatkan Sabtu pada minggu yang sama dengan 'base'
-    const saturday = new Date(base);
-    saturday.setDate(base.getDate() + (6 - dow));
-    // Dapatkan Senin pada minggu yang sama (6 hari sebelum Sabtu)
-    const monday = new Date(saturday);
-    monday.setDate(saturday.getDate() - 5);
-
-    const ws = monday.toISOString().slice(0, 10);
-    const we = saturday.toISOString().slice(0, 10);
-
+    const { ws, we } = getCurrentWeekMondaySaturday();
     onProcessPayroll(payload, ws, we);
     setStagedPayments([]);
   };
@@ -142,26 +148,6 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
   );
 
   const isAllowanceDisabled = parseInt(currentInputs.daysWorked, 10) === 6;
-
-  // Otomatis isi jumlah hari berdasarkan periode tanggal (hanya Senin–Sabtu)
-  useEffect(() => {
-    if (!periodStart || !periodEnd) return;
-    const start = new Date(`${periodStart}T00:00:00`);
-    const end = new Date(`${periodEnd}T00:00:00`);
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
-    if (end < start) return;
-    // Hitung hanya hari kerja (Mon–Sat); Minggu (0) tidak dihitung
-    let count = 0;
-    const d = new Date(start);
-    while (d.getTime() <= end.getTime()) {
-      const day = d.getDay(); // 0=Sun,1=Mon,...,6=Sat
-      if (day !== 0) count += 1;
-      d.setDate(d.getDate() + 1);
-    }
-    const bounded = Math.min(6, Math.max(0, count));
-    // Reuse logic untuk mengatur tunjangan saat 6 hari
-    handleInputChange('daysWorked', String(bounded));
-  }, [periodStart, periodEnd]);
 
   return (
     <div className="space-y-6">
@@ -192,10 +178,10 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
             {selectedEmployee && (
               <div className="border-t border-slate-200 pt-4 space-y-3">
                 <div className="flex items-center space-x-3">
-                  <img src={selectedEmployee.image_url || ''} alt={selectedEmployee.name} className="w-10 h-10 rounded-full object-cover" />
+                  <img src={(selectedEmployee as any).image_url || ''} alt={(selectedEmployee as any).name} className="w-10 h-10 rounded-full object-cover" />
                   <div>
-                    <p className="font-bold text-slate-800">{selectedEmployee.name}</p>
-                    <p className="text-sm text-slate-500">{formatRupiah(selectedEmployee.daily_rate)} / hari</p>
+                    <p className="font-bold text-slate-800">{(selectedEmployee as any).name}</p>
+                    <p className="text-sm text-slate-500">{formatRupiah((selectedEmployee as any).daily_rate)} / hari</p>
                   </div>
                 </div>
 
@@ -211,35 +197,6 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
                     min={1}
                     max={6}
                   />
-                </div>
-
-                {/* Tanggal Periode (1 input: Akhir/Sabtu) */}
-                <div>
-                  <label className="text-xs text-slate-600 font-medium ml-1 mb-1 block">Akhir Periode (Sabtu)</label>
-                  <input
-                    type="date"
-                    value={periodEnd}
-                    onChange={e => {
-                      const val = e.target.value;
-                      setPeriodEnd(val);
-                      if (val) {
-                        const end = new Date(`${val}T00:00:00`);
-                        const dow = end.getDay(); // 0..6
-                        // Snap ke Sabtu pada minggu yang sama
-                        const saturday = new Date(end);
-                        saturday.setDate(end.getDate() + (6 - dow));
-                        // Senin adalah 5 hari sebelum Sabtu
-                        const monday = new Date(saturday);
-                        monday.setDate(saturday.getDate() - 5);
-                        setPeriodStart(monday.toISOString().slice(0, 10));
-                        setPeriodEnd(saturday.toISOString().slice(0, 10));
-                      } else {
-                        setPeriodStart('');
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-transparent"
-                  />
-                  <p className="text-[11px] text-slate-500 mt-1">Periode otomatis diset Senin–Sabtu. Minggu tidak dihitung.</p>
                 </div>
 
                 {/* Tabel compact untuk Tunjangan / Tunjangan Lain / Potongan */}
@@ -371,3 +328,4 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
 };
 
 export default PayrollCalculator;
+
