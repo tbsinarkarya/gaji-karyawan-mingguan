@@ -291,10 +291,9 @@ function openPrintOverlay(html: string) {
 
     // Gunakan srcdoc jika didukung, fallback ke Blob URL
     try {
-      // @ts-ignore - older TS may not know srcdoc
-      if ('srcdoc' in iframe) {
-        // @ts-ignore
-        iframe.srcdoc = html;
+      const supportsSrcdoc = typeof (iframe as any).srcdoc !== 'undefined';
+      if (supportsSrcdoc) {
+        (iframe as any).srcdoc = html;
       } else {
         const blob = new Blob([html], { type: 'text/html' });
         iframe.src = URL.createObjectURL(blob);
