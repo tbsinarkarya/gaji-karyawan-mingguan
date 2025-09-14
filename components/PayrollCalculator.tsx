@@ -82,7 +82,7 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
     if (!selectedEmployee) return alert('Silakan pilih karyawan terlebih dahulu.');
 
     const daysWorked = parseInt(currentInputs.daysWorked, 10) || 0;
-    if (daysWorked <= 0 || daysWorked > 7) return alert('Jumlah hari kerja harus antara 1 dan 7.');
+    if (daysWorked <= 0 || daysWorked > 6) return alert('Jumlah hari kerja harus antara 1 dan 6.');
 
     const totalAllowance = parseRupiah(currentInputs.totalAllowance);
     const extraAllowance = parseRupiah(currentInputs.extraAllowance);
@@ -126,15 +126,22 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
 
   const isAllowanceDisabled = parseInt(currentInputs.daysWorked, 10) === 6;
 
-  // Otomatis isi jumlah hari berdasarkan periode tanggal
+  // Otomatis isi jumlah hari berdasarkan periode tanggal (hanya Senin–Sabtu)
   useEffect(() => {
     if (!periodStart || !periodEnd) return;
     const start = new Date(`${periodStart}T00:00:00`);
     const end = new Date(`${periodEnd}T00:00:00`);
     if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
     if (end < start) return;
-    const diffDays = Math.floor((end.getTime() - start.getTime()) / 86400000) + 1; // inklusif
-    const bounded = Math.max(1, Math.min(7, diffDays));
+    // Hitung hanya hari kerja (Mon–Sat); Minggu (0) tidak dihitung
+    let count = 0;
+    const d = new Date(start);
+    while (d.getTime() <= end.getTime()) {
+      const day = d.getDay(); // 0=Sun,1=Mon,...,6=Sat
+      if (day !== 0) count += 1;
+      d.setDate(d.getDate() + 1);
+    }
+    const bounded = Math.min(6, Math.max(0, count));
     // Reuse logic untuk mengatur tunjangan saat 6 hari
     handleInputChange('daysWorked', String(bounded));
   }, [periodStart, periodEnd]);
@@ -178,38 +185,36 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
                 {/* Hari Kerja */}
                 <div>
                   <label className="text-xs text-slate-600 font-medium ml-1 mb-1 block">Hari Kerja</label>
-                  <div className="flex flex-col sm:flex-row sm:items-end gap-3">
-                    <div className="sm:w-40">
-                      <input
-                        type="number"
-                        placeholder="Jumlah hari"
-                        value={currentInputs.daysWorked}
-                        onChange={e => handleInputChange('daysWorked', e.target.value)}
-                        className="w-full pl-4 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent transition"
-                        min={1}
-                        max={7}
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label className="text-[11px] text-slate-600 font-medium ml-1 mb-1 block">Tanggal Periode</label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="date"
-                          value={periodStart}
-                          onChange={e => setPeriodStart(e.target.value)}
-                          className="px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-transparent"
-                        />
-                        <span className="text-slate-500">s/d</span>
-                        <input
-                          type="date"
-                          value={periodEnd}
-                          onChange={e => setPeriodEnd(e.target.value)}
-                          className="px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-transparent"
-                        />
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-1">Mengisi otomatis kolom jumlah hari (maks. 7)</p>
-                    </div>
+                  <input
+                    type="number"
+                    placeholder="Jumlah hari"
+                    value={currentInputs.daysWorked}
+                    onChange={e => handleInputChange('daysWorked', e.target.value)}
+                    className="w-full pl-4 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent transition"
+                    min={1}
+                    max={6}
+                  />
+                </div>
+
+                {/* Tanggal Periode (opsional, 1 kolom penuh) */}
+                <div>
+                  <label className="text-xs text-slate-600 font-medium ml-1 mb-1 block">Tanggal Periode</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={periodStart}
+                      onChange={e => setPeriodStart(e.target.value)}
+                      className="px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                    />
+                    <span className="text-slate-500">s/d</span>
+                    <input
+                      type="date"
+                      value={periodEnd}
+                      onChange={e => setPeriodEnd(e.target.value)}
+                      className="px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                    />
                   </div>
+                  <p className="text-[11px] text-slate-500 mt-1">Mengisi otomatis jumlah hari kerja (maks. 6). Minggu tidak dihitung.</p>
                 </div>
 
                 {/* Tabel compact untuk Tunjangan / Tunjangan Lain / Potongan */}
