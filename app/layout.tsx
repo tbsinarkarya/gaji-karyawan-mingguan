@@ -1,12 +1,15 @@
 import "./globals.css";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 export const metadata: Metadata = {
   title: "Payroll App",
   description: "Aplikasi penggajian mingguan karyawan",
-  themeColor: "#4f46e5",
   manifest: "/manifest.json",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#4f46e5",
 };
 
 export default function RootLayout({
@@ -18,7 +21,6 @@ export default function RootLayout({
     <html lang="id">
       <head>
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#4f46e5" />
       </head>
       <body>
         {children}

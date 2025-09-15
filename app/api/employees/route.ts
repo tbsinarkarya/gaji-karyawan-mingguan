@@ -36,7 +36,14 @@ export async function GET() {
     const result = await pool.query(
       "SELECT id, name, position, daily_rate, weekly_allowance, image_url FROM employees ORDER BY id DESC"
     );
-    return json(result.rows, 200, true);
+    return new NextResponse(JSON.stringify(result.rows), {
+      status: 200,
+      headers: {
+        "content-type": "application/json",
+        // Izinkan cache singkat di edge agar load awal berikutnya lebih cepat
+        "cache-control": "public, s-maxage=60, stale-while-revalidate=300",
+      },
+    });
   } catch (error) {
     console.error("GET /api/employees error:", error);
     return new NextResponse("Database read error", { status: 500 });
