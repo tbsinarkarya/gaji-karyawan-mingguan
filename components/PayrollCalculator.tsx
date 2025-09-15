@@ -59,11 +59,14 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
     const id = Number(e.target.value);
     setSelectedEmployeeId(id);
     const emp = employees.find(x => x.id === id);
-    const autoAllowance = emp && typeof (emp as any).weekly_allowance === 'number'
-      ? String((emp as any).weekly_allowance)
-      : '';
-    // Default ke 6 hari kerja dan auto isi tunjangan mingguan
-    setCurrentInputs({ daysWorked: '6', totalAllowance: autoAllowance, extraAllowance: '', loanDeduction: '0' });
+    const weekly = Number((emp as any)?.weekly_allowance ?? 0);
+    // Default ke 6 hari kerja dan auto isi tunjangan mingguan (apapun tipe dari DB)
+    setCurrentInputs({
+      daysWorked: '6',
+      totalAllowance: String(weekly),
+      extraAllowance: '',
+      loanDeduction: '0',
+    });
   };
 
   const handleInputChange = (field: keyof typeof currentInputs, value: string) => {
@@ -328,4 +331,3 @@ const PayrollCalculator: React.FC<PayrollCalculatorProps> = ({ employees, onProc
 };
 
 export default PayrollCalculator;
-
