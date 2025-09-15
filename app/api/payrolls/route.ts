@@ -99,23 +99,56 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return new NextResponse("Unauthorized", { status: 401 });
   try {
-    const weeksRes = await pool.query<{ week_start: string; week_end: string }>(
-      `SELECT week_start, week_end
-       FROM payroll
-       GROUP BY week_start, week_end
-       ORDER BY week_start DESC`
+    // Single-query aggregation untuk menghindari N+1 query per minggu
+    const agg = await pool.query<{
+      week_start: string;
+      week_end: string;
+      total_payroll: string | number;
+      employee_payments: any[];
+    }>(
+      `
+      SELECT
+        TO_CHAR(p.week_start, 'YYYY-MM-DD') AS week_start,
+        TO_CHAR(p.week_end,   'YYYY-MM-DD') AS week_end,
+        SUM(p.total_salary) AS total_payroll,
+        JSON_AGG(
+          JSON_BUILD_OBJECT(
+            'payrollId', p.id,
+            'employeeId', p.employee_id,
+            'employeeName', e.name,
+            'position', e.position,
+            'daysWorked', p.total_days,
+            'basePay', (COALESCE(e.daily_rate,0) * COALESCE(p.total_days,0)),
+            'totalAllowance', p.total_allowance_input,
+            'extraAllowance', p.extra_allowance,
+            'loanDeduction', p.loan_deduction,
+            'totalPay', p.total_salary,
+            'image_url', e.image_url,
+            'weeklyAllowanceBase', e.weekly_allowance
+          )
+          ORDER BY p.id ASC
+        ) AS employee_payments
+      FROM payroll p
+      JOIN employees e ON p.employee_id = e.id
+      GROUP BY p.week_start, p.week_end
+      ORDER BY p.week_start DESC
+      `
     );
 
-    const payload = [];
-    for (const w of weeksRes.rows) {
-      payload.push(await buildWeeklyPayroll(w.week_start, w.week_end));
-    }
+    const payload = agg.rows.map((r) => ({
+      id: `${r.week_start}_${r.week_end}`,
+      weekStartDate: r.week_start,
+      weekEndDate: r.week_end,
+      totalPayroll: Number(r.total_payroll ?? 0),
+      employeePayments: Array.isArray(r.employee_payments) ? r.employee_payments : [],
+    }));
 
     return new NextResponse(JSON.stringify(payload), {
       status: 200,
       headers: {
         "content-type": "application/json",
-        "cache-control": "no-store",
+        // Izinkan CDN caching singkat untuk percepat load ulang
+        "cache-control": "public, s-maxage=60, stale-while-revalidate=300",
       },
     });
   } catch (error) {
